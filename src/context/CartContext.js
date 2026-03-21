@@ -1,7 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { calcularPrecioFinal } from '../utils/discounts';
 import { useAuth } from './AuthContext';
+import { PREMIO_PRODUCT_ID, PREMIO_THRESHOLD } from '../constants/cartRules';
+import { getProductById } from '../api/woocommerce';
 
 const CART_STORAGE_KEY = '@marykay_cart';
 
@@ -84,6 +86,50 @@ export function CartProvider({ children }) {
   );
 
   const totalPrice = totalConDescuento;
+
+  // Premio (regalo automático): total sin premio para evaluar threshold
+  const hasPremio = useMemo(
+    () => cartItems.some((item) => item.product.id === PREMIO_PRODUCT_ID),
+    [cartItems]
+  );
+  const totalSinPremio = useMemo(
+    () => cartItems.reduce((sum, item) => {
+      if (item.product.id === PREMIO_PRODUCT_ID) return sum;
+      const info = calcularPrecioFinal(item.product, user);
+      return sum + info.precioFinal * item.quantity;
+    }, 0),
+    [cartItems, user]
+  );
+  const premioProductRef = useRef(null);
+
+  useEffect(() => {
+    if (!isRestored) return;
+    const shouldHavePremio = totalSinPremio >= PREMIO_THRESHOLD;
+
+    if (shouldHavePremio && !hasPremio) {
+      // Auto-add premio
+      if (premioProductRef.current) {
+        setCartItems((prev) => {
+          if (prev.some((i) => i.product.id === PREMIO_PRODUCT_ID)) return prev;
+          return [...prev, { product: premioProductRef.current, quantity: 1 }];
+        });
+      } else {
+        getProductById(PREMIO_PRODUCT_ID).then((res) => {
+          if (res.success && res.data) {
+            const premioProduct = { ...res.data, price: '0', regular_price: '0', sale_price: '0' };
+            premioProductRef.current = premioProduct;
+            setCartItems((prev) => {
+              if (prev.some((i) => i.product.id === PREMIO_PRODUCT_ID)) return prev;
+              return [...prev, { product: premioProduct, quantity: 1 }];
+            });
+          }
+        });
+      }
+    } else if (!shouldHavePremio && hasPremio) {
+      // Auto-remove premio
+      setCartItems((prev) => prev.filter((i) => i.product.id !== PREMIO_PRODUCT_ID));
+    }
+  }, [totalSinPremio, hasPremio, isRestored]);
 
   const persistCart = useCallback(async (items) => {
     try {
@@ -198,6 +244,8 @@ export function CartProvider({ children }) {
     discountNivel,
     discountEspeciales,
     totalNetos,
+    hasPremio,
+    totalSinPremio,
     addToCart,
     removeFromCart,
     updateQuantity,

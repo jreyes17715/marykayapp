@@ -182,7 +182,7 @@ export default function ProfileScreen() {
         {user?.hasBoughtKit ? (
           <>
             <Text style={styles.estadoLine}>✅ Kit Inicial: Comprado</Text>
-            <Text style={styles.estadoSub}>Compra mínima: RD$ 5,000 por pedido</Text>
+            <Text style={styles.estadoSub}>Compra mínima: RD$ 10,000 por pedido</Text>
             {reactivation && (
               <Text style={[styles.estadoLine, { color: REACTIVACION }]}>
                 ⚠️ Reactivación requerida: mínimo RD$ 20,000

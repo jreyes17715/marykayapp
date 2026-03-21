@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
@@ -102,6 +103,15 @@ export default function LoginScreen() {
         </View>
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+        <TouchableOpacity
+          onPress={() => Linking.openURL('https://aromadelrosalinvestments.com/my-account/lost-password/')}
+          disabled={loading}
+          activeOpacity={0.8}
+          style={styles.forgotPasswordWrap}
+        >
+          <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.loginBtn, loading && styles.loginBtnDisabled]}
@@ -217,6 +227,14 @@ const styles = StyleSheet.create({
     color: colors.primary,
     marginBottom: 12,
     textAlign: 'center',
+  },
+  forgotPasswordWrap: {
+    alignSelf: 'flex-end',
+    marginBottom: 8,
+  },
+  forgotPasswordText: {
+    fontSize: 13,
+    color: colors.primary,
   },
   loginBtn: {
     backgroundColor: colors.primary,

@@ -4,6 +4,7 @@
  */
 
 import axios from 'axios';
+import Constants from 'expo-constants';
 
 function stripHtml(html) {
   if (!html || typeof html !== 'string') return '';
@@ -15,10 +16,11 @@ function stripHtml(html) {
 export const FLAI_BYPASS = true;
 // ============================================
 
-const FLAI_BASE = 'https://cel.flai.com.do';
+const extra = Constants.expoConfig?.extra || {};
+const FLAI_BASE = extra.FLAI_BASE_URL || 'https://cel.flai.com.do';
 const TIMEOUT_MS = 15000;
-const FLAI_LOGIN = 'aromadelrosal';
-const FLAI_PASSWORD = 'aroma*27';
+const FLAI_LOGIN = extra.FLAI_LOGIN || '';
+const FLAI_PASSWORD = extra.FLAI_PASSWORD || '';
 
 let sessionCookie = null;
 

@@ -26,7 +26,7 @@ import {
 } from '../api/flai';
 import { calcularPrecioFinal } from '../utils/discounts';
 import { validarCarrito, getValidationMessage, getMinRequiredForUser } from '../utils/cartValidation';
-import { KIT_PRODUCT_ID } from '../constants/cartRules';
+import { KIT_PRODUCT_ID, PREMIO_PRODUCT_ID } from '../constants/cartRules';
 import QuantitySelector from '../components/QuantitySelector';
 import colors from '../constants/colors';
 import theme from '../constants/theme';
@@ -58,6 +58,8 @@ export default function CartScreen() {
     discountNivel,
     discountEspeciales,
     totalNetos,
+    hasPremio,
+    totalSinPremio,
     addToCart,
     incrementQuantity,
     decrementQuantity,
@@ -70,9 +72,13 @@ export default function CartScreen() {
   const [stockErrorMsg, setStockErrorMsg] = useState(null);
   const timeoutRef = useRef(null);
 
+  const premioTotal = useMemo(
+    () => cartItems.reduce((sum, item) => item.product.id === PREMIO_PRODUCT_ID ? sum : 0, 0),
+    [cartItems]
+  );
   const validation = useMemo(
-    () => validarCarrito(cartItems, user, totalConDescuento),
-    [cartItems, user, totalConDescuento]
+    () => validarCarrito(cartItems, user, totalConDescuento, totalConDescuento - totalSinPremio),
+    [cartItems, user, totalConDescuento, totalSinPremio]
   );
   const isValid = validation.valid;
   const validationMessage = getValidationMessage(validation);
@@ -228,20 +234,28 @@ export default function CartScreen() {
   const renderItem = useCallback(
     ({ item }) => {
       const { product, quantity } = item;
+      const isPremio = product.id === PREMIO_PRODUCT_ID;
       const priceInfo = calcularPrecioFinal(product, user);
-      const lineTotal = priceInfo.precioFinal * quantity;
+      const lineTotal = isPremio ? 0 : priceInfo.precioFinal * quantity;
       const maxQty = getMaxQty(product);
-      const showDiscount = user && priceInfo.tieneDescuento && !priceInfo.esNeto;
+      const showDiscount = user && priceInfo.tieneDescuento && !priceInfo.esNeto && !isPremio;
 
       return (
         <View style={styles.itemCard}>
-          <TouchableOpacity
-            style={styles.deleteBtn}
-            onPress={() => handleRemoveItem(product.id)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Text style={styles.deleteBtnText}>✕</Text>
-          </TouchableOpacity>
+          {!isPremio && (
+            <TouchableOpacity
+              style={styles.deleteBtn}
+              onPress={() => handleRemoveItem(product.id)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.deleteBtnText}>✕</Text>
+            </TouchableOpacity>
+          )}
+          {isPremio && (
+            <View style={styles.premioBadge}>
+              <Text style={styles.premioBadgeText}>Regalo</Text>
+            </View>
+          )}
           <View style={styles.itemRow}>
             <Image
               source={{ uri: getProductImage(product) }}
@@ -253,7 +267,9 @@ export default function CartScreen() {
                 {stripHtml(product.name || '') || 'Producto'}
               </Text>
               <View style={styles.unitPriceRow}>
-                {showDiscount ? (
+                {isPremio ? (
+                  <Text style={styles.unitPriceFree}>Gratis</Text>
+                ) : showDiscount ? (
                   <>
                     <Text style={styles.unitPriceStrike}>
                       {formatPrice(priceInfo.precioOriginal)}
@@ -268,17 +284,21 @@ export default function CartScreen() {
                   </Text>
                 )}
               </View>
-              <View style={styles.quantityRow}>
-                <QuantitySelector
-                  value={quantity}
-                  onIncrement={() => incrementQuantity(product.id)}
-                  onDecrement={() => decrementQuantity(product.id)}
-                  min={1}
-                  max={maxQty}
-                  size="small"
-                />
-              </View>
-              <Text style={styles.subtotal}>{formatPrice(lineTotal.toFixed(2))}</Text>
+              {!isPremio && (
+                <View style={styles.quantityRow}>
+                  <QuantitySelector
+                    value={quantity}
+                    onIncrement={() => incrementQuantity(product.id)}
+                    onDecrement={() => decrementQuantity(product.id)}
+                    min={1}
+                    max={maxQty}
+                    size="small"
+                  />
+                </View>
+              )}
+              <Text style={styles.subtotal}>
+                {isPremio ? 'RD$ 0.00' : formatPrice(lineTotal.toFixed(2))}
+              </Text>
             </View>
           </View>
         </View>
@@ -639,6 +659,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.darkGray,
     fontWeight: 'bold',
+  },
+  premioBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 1,
+    backgroundColor: colors.success,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  premioBadgeText: {
+    fontSize: 12,
+    color: colors.white,
+    fontWeight: 'bold',
+  },
+  unitPriceFree: {
+    fontSize: 14,
+    color: colors.success,
+    fontWeight: '700',
   },
   itemRow: {
     flexDirection: 'row',

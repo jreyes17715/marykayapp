@@ -5,6 +5,7 @@
 
 import {
   KIT_PRODUCT_ID,
+  PREMIO_PRODUCT_ID,
   MIN_AMOUNT_NEW,
   MIN_AMOUNT_RETURNING,
   MIN_AMOUNT_REACTIVATION,
@@ -68,7 +69,7 @@ export function getValidationMessage(result) {
     case 'reactivation':
       return `¡Bienvenida de vuelta! 🌸 Para reactivar tu cuenta después de 90 días de inactividad, tu pedido debe ser mínimo RD$ 20,000. Faltan RD$ ${gapStr}.`;
     case 'returning':
-      return `Faltan RD$ ${gapStr} para el pedido mínimo de RD$ 5,000.`;
+      return `Faltan RD$ ${gapStr} para el pedido mínimo de RD$ 10,000.`;
     case 'missing_kit':
       return 'Requisito: El Kit Inicial es obligatorio para tu primera compra.';
     case 'new_customer':
@@ -79,14 +80,23 @@ export function getValidationMessage(result) {
 }
 
 /**
+ * True si el item es el producto premio (regalo automático).
+ */
+export function isPremioItem(item) {
+  return item && item.product && item.product.id === PREMIO_PRODUCT_ID;
+}
+
+/**
  * Valida el carrito según Kit Inicial y mínimos.
+ * Excluye el producto PREMIO del cálculo de mínimos.
  * @param {Array} cartItems - [{ product, quantity }]
  * @param {Object|null} user - Usuario del AuthContext
  * @param {number} totalConDescuento - Total a pagar (con descuentos)
+ * @param {number} [premioTotal=0] - Total del premio a excluir de mínimos
  * @returns {{ valid: boolean, type?: string, gap?: number, minRequired?: number }}
  */
-export function validarCarrito(cartItems, user, totalConDescuento) {
-  const total = typeof totalConDescuento === 'number' ? totalConDescuento : 0;
+export function validarCarrito(cartItems, user, totalConDescuento, premioTotal = 0) {
+  const total = typeof totalConDescuento === 'number' ? totalConDescuento - premioTotal : 0;
 
   if (!user) return { valid: true };
   if (user.role === 'administrator' || user.isAdmin) return { valid: true };
