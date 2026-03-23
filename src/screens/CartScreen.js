@@ -21,6 +21,7 @@ import {
   FLAI_BYPASS,
   checkAvailability,
   createReservation,
+  cancelReservation,
   cartItemsToFlaiProducts,
   getInsufficientStock,
 } from '../api/flai';
@@ -28,6 +29,7 @@ import { calcularPrecioFinal } from '../utils/discounts';
 import { validarCarrito, getValidationMessage, getMinRequiredForUser } from '../utils/cartValidation';
 import { KIT_PRODUCT_ID, PREMIO_PRODUCT_ID } from '../constants/cartRules';
 import QuantitySelector from '../components/QuantitySelector';
+import FreeShippingBanner from '../components/FreeShippingBanner';
 import colors from '../constants/colors';
 import theme from '../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -60,6 +62,8 @@ export default function CartScreen() {
     totalNetos,
     hasPremio,
     totalSinPremio,
+    shippingCost,
+    shipping,
     addToCart,
     incrementQuantity,
     decrementQuantity,
@@ -167,6 +171,7 @@ export default function CartScreen() {
         throw new Error('STOCK_INSUFFICIENT:' + lines.join('\n'));
       }
       const userData = {
+        userId: user?.customerId || 1,
         fullName: user?.displayName || '',
         phone: user?.billing?.phone || '',
         address: user?.billing?.address_1 || '',
@@ -200,8 +205,15 @@ export default function CartScreen() {
         return;
       }
       Alert.alert(
-        'Error',
-        msg || 'No pudimos verificar la disponibilidad. Intenta de nuevo.'
+        'Error de verificación',
+        (msg || 'No pudimos verificar la disponibilidad.') + '\n\n¿Deseas continuar sin verificar stock?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Continuar sin verificar',
+            onPress: () => navigation.navigate('Checkout'),
+          },
+        ]
       );
     }
   }, [navigation, cartItems.length, isValid, cartItems, user]);
@@ -402,6 +414,11 @@ export default function CartScreen() {
         keyExtractor={keyExtractor}
         contentContainerStyle={[styles.listContent, { paddingBottom: 280 }]}
         showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          user?.hasFreeShipping
+            ? <FreeShippingBanner expiresAt={user.freeShippingUntil} />
+            : null
+        }
       />
 
       {showProgress && (
@@ -464,13 +481,24 @@ export default function CartScreen() {
           )}
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Envío</Text>
-            <Text style={styles.shippingPlaceholder}>Por calcular</Text>
+            {shipping.isFree ? (
+              <Text style={styles.shippingFree}>Gratis</Text>
+            ) : shipping.label === 'Por calcular' ? (
+              <Text style={styles.shippingPlaceholder}>Por calcular</Text>
+            ) : (
+              <Text style={styles.summaryValue}>{shipping.label}</Text>
+            )}
           </View>
+          {!shipping.isFree && (
+            <Text style={styles.shippingHint}>
+              Envio gratis en compras +RD$60,000
+            </Text>
+          )}
           <View style={styles.separator} />
           <View style={styles.summaryRow}>
             <Text style={styles.totalLabel}>Total con descuentos</Text>
             <Text style={styles.totalValue}>
-              {formatPrice(totalConDescuento.toFixed(2))}
+              {formatPrice((totalConDescuento + shippingCost).toFixed(2))}
             </Text>
           </View>
           <Text style={styles.itemCount}>
@@ -762,6 +790,17 @@ const styles = StyleSheet.create({
   shippingPlaceholder: {
     fontSize: 14,
     color: colors.gray,
+  },
+  shippingFree: {
+    fontSize: 14,
+    color: colors.success,
+    fontWeight: '600',
+  },
+  shippingHint: {
+    fontSize: 12,
+    color: colors.gray,
+    marginBottom: 6,
+    marginTop: -4,
   },
   discountValue: {
     fontSize: 14,

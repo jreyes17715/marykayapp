@@ -11,12 +11,24 @@ function stripHtml(html) {
   return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-// ============================================
-// BYPASS TEMPORAL - Cambiar a false cuando FLAI funcione
-export const FLAI_BYPASS = true;
-// ============================================
-
 const extra = Constants.expoConfig?.extra || {};
+
+// FLAI bypass: controlado por variable de entorno.
+// Auto-bypass si no hay credenciales configuradas.
+function resolveBypass() {
+  const envBypass = extra.FLAI_BYPASS;
+  if (envBypass === 'false' || envBypass === false) return false;
+  if (envBypass === 'true' || envBypass === true) return true;
+  // Auto-bypass si no hay credenciales
+  const login = extra.FLAI_LOGIN || '';
+  const password = extra.FLAI_PASSWORD || '';
+  if (!login || !password) return true;
+  // Default: bypass activo
+  return true;
+}
+
+export const FLAI_BYPASS = resolveBypass();
+
 const FLAI_BASE = extra.FLAI_BASE_URL || 'https://cel.flai.com.do';
 const TIMEOUT_MS = 15000;
 const FLAI_LOGIN = extra.FLAI_LOGIN || '';
@@ -27,7 +39,16 @@ let sessionCookie = null;
 const client = axios.create({
   baseURL: FLAI_BASE,
   timeout: TIMEOUT_MS,
+  withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
+});
+
+client.interceptors.response.use((response) => {
+  const cookie = getCookieFromResponse(response);
+  if (cookie) {
+    sessionCookie = cookie;
+  }
+  return response;
 });
 
 function getCookieFromResponse(response) {
@@ -127,11 +148,11 @@ export async function createReservation(products, userData = {}) {
       params: {
         json: {
           products,
-          user_id: 1,
+          user_id: userData.userId || 1,
           additionalInfo: {
             client_order_ref: orderRef,
             client: {
-              id: 1,
+              id: userData.userId || 1,
               full_name: userData.fullName || 'Cliente',
               phone: userData.phone || '',
               mobile: userData.phone || '',
@@ -158,6 +179,41 @@ export async function createReservation(products, userData = {}) {
       return createReservation(products, userData);
     }
     const msg = err.response?.data?.message || err.message || 'Error al crear la reserva';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Cancela una reserva en FLAI.
+ * @param {number|string} orderId - ID de la reserva a cancelar
+ * @returns {Promise<{ success: boolean, error?: string }>}
+ */
+export async function cancelReservation(orderId) {
+  if (FLAI_BYPASS) {
+    return { success: true };
+  }
+  if (!orderId) {
+    return { success: false, error: 'No hay reserva que cancelar' };
+  }
+  try {
+    if (!sessionCookie) {
+      const auth = await flaiAuth();
+      if (!auth.success) return { success: false, error: auth.error };
+    }
+    await client.post(
+      '/api/cart/products/cancel/',
+      { params: { order_id: orderId } },
+      { ...requestConfig(), timeout: TIMEOUT_MS }
+    );
+    return { success: true };
+  } catch (err) {
+    if (err.response?.status === 401) {
+      sessionCookie = null;
+      const auth = await flaiAuth();
+      if (!auth.success) return { success: false, error: auth.error };
+      return cancelReservation(orderId);
+    }
+    const msg = err.response?.data?.message || err.message || 'Error al cancelar reserva';
     return { success: false, error: msg };
   }
 }

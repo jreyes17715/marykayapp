@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { calcularPrecioFinal } from '../utils/discounts';
+import { calculateShipping } from '../utils/shipping';
 import { useAuth } from './AuthContext';
 import { PREMIO_PRODUCT_ID, PREMIO_THRESHOLD } from '../constants/cartRules';
 import { getProductById } from '../api/woocommerce';
@@ -72,6 +73,7 @@ export function CartProvider({ children }) {
   const { user } = useAuth();
   const [cartItems, setCartItems] = useState([]);
   const [isRestored, setIsRestored] = useState(false);
+  const [shippingProvince, setShippingProvince] = useState('');
 
   const {
     totalItems,
@@ -86,6 +88,12 @@ export function CartProvider({ children }) {
   );
 
   const totalPrice = totalConDescuento;
+
+  const shipping = useMemo(
+    () => calculateShipping(shippingProvince, totalConDescuento, user?.hasFreeShipping ?? false),
+    [shippingProvince, totalConDescuento, user?.hasFreeShipping]
+  );
+  const shippingCost = shipping.cost;
 
   // Premio (regalo automático): total sin premio para evaluar threshold
   const hasPremio = useMemo(
@@ -246,6 +254,10 @@ export function CartProvider({ children }) {
     totalNetos,
     hasPremio,
     totalSinPremio,
+    shippingProvince,
+    shippingCost,
+    shipping,
+    setShippingProvince,
     addToCart,
     removeFromCart,
     updateQuantity,

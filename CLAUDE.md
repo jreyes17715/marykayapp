@@ -55,7 +55,7 @@ Stack: React Native (Expo 54) + JavaScript (sin TypeScript) + WooCommerce API + 
   5. Precio neto (meta `_es_precio_neto`) = 0% descuento
 - **Minimos de carrito** (en `src/constants/cartRules.js`):
   - Cliente nuevo: Kit (ID 4994) + RD$25,000
-  - Cliente recurrente: RD$5,000
+  - Cliente recurrente: RD$10,000
   - Reactivacion (+90 dias): RD$20,000
   - Admin/Staff: sin minimo
 - **Producto Kit ID**: 4994 (obligatorio para nuevas consultoras)
@@ -71,11 +71,13 @@ Stack: React Native (Expo 54) + JavaScript (sin TypeScript) + WooCommerce API + 
 - LoginScreen, RegisterScreen y ConsultantListScreen son pantallas fuera de tabs
 
 ### Advertencias
-- Las credenciales API estan hardcodeadas en `src/constants/config.js` y `src/api/flai.js`
-- No hay archivo .env - se deben migrar a variables de entorno
-- FLAI esta bypassed (FLAI_BYPASS = true en flai.js)
+- Variables de entorno configuradas via `.env` + `app.config.js` (credenciales NO hardcodeadas)
+- FLAI esta bypassed (FLAI_BYPASS = true en flai.js) - Fase 2
 - Las notificaciones son estaticas (hardcoded en NotificationsScreen)
-- Los banners son estaticos (hardcoded en HomeScreen)
+- Los banners son estaticos (hardcoded en BannerCarousel)
+- Envio no calculado (muestra "Por calcular")
+- RegisterScreen tiene formulario pero NO llama API real
+- No hay tests unitarios ni de integracion
 
 ### Comandos
 ```bash

@@ -35,6 +35,7 @@ export default {
       FLAI_BASE_URL: process.env.FLAI_BASE_URL,
       FLAI_LOGIN: process.env.FLAI_LOGIN,
       FLAI_PASSWORD: process.env.FLAI_PASSWORD,
+      FLAI_BYPASS: process.env.FLAI_BYPASS,
     },
   },
 };

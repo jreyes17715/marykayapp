@@ -10,11 +10,13 @@ import {
   Platform,
   ActivityIndicator,
   Modal,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import DropdownSelector from '../components/DropdownSelector';
 import { PROVINCIAS_RD, NCF_TIPOS } from '../constants/provinces';
+import { createCustomer } from '../api/woocommerce';
 
 const PRIMARY = '#d11e51';
 const SECTION_TITLE = { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 8 };
@@ -156,13 +158,62 @@ export default function RegisterScreen() {
     setLoading(true);
     setErrors({});
 
-    // TODO: Implementar llamada real al API de registro
-    // POST /wp-json/wp/v2/users o endpoint personalizado
-    // Body: { username: email, email, password, first_name, last_name, meta: { phone, address, etc } }
+    try {
+      const customerData = {
+        email: correo.trim(),
+        first_name: nombre.trim(),
+        last_name: apellidos.trim(),
+        username: correo.trim(),
+        password: password,
+        billing: {
+          first_name: nombre.trim(),
+          last_name: apellidos.trim(),
+          address_1: direccion1.trim(),
+          address_2: direccion2.trim(),
+          city: ciudad,
+          state: provincia,
+          postcode: codigoPostal.trim(),
+          country: 'DO',
+          email: correo.trim(),
+          phone: telefono.trim(),
+        },
+        shipping: {
+          first_name: nombre.trim(),
+          last_name: apellidos.trim(),
+          address_1: direccion1.trim(),
+          address_2: direccion2.trim(),
+          city: ciudad,
+          state: provincia,
+          postcode: codigoPostal.trim(),
+          country: 'DO',
+        },
+        meta_data: [
+          { key: 'telefono_casa', value: telefonoCasa.trim() },
+          { key: 'telefono_trabajo', value: telefonoTrabajo.trim() },
+          { key: 'fecha_inicio', value: fechaInicio.trim() },
+          { key: 'nombre_reclutador', value: nombreReclutador.trim() },
+          { key: 'tipo_ncf', value: tipoNcf },
+          { key: 'has_bought_kit', value: 'no' },
+        ],
+      };
 
-    await new Promise((r) => setTimeout(r, 2000));
-    setLoading(false);
-    setSuccessModalVisible(true);
+      const result = await createCustomer(customerData);
+      setLoading(false);
+
+      if (result.success) {
+        setSuccessModalVisible(true);
+      } else {
+        const errorMsg = result.error || 'No se pudo crear la cuenta. Intenta de nuevo.';
+        if (errorMsg.toLowerCase().includes('email') && errorMsg.toLowerCase().includes('exist')) {
+          setErrors({ correo: 'Este correo ya está registrado' });
+        } else {
+          Alert.alert('Error al registrar', errorMsg);
+        }
+      }
+    } catch (e) {
+      setLoading(false);
+      Alert.alert('Error', e?.message || 'No se pudo crear la cuenta. Intenta de nuevo.');
+    }
   };
 
   const isFormValid = useMemo(() => {

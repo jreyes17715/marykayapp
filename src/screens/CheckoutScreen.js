@@ -14,9 +14,11 @@ import {
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import { createOrder, getProductImage, formatPrice, stripHtml } from '../api/woocommerce';
+import { createOrder, getProductImage, formatPrice, stripHtml, updateCustomer } from '../api/woocommerce';
 import { getProductPrice } from '../utils/helpers';
 import { validarCarrito, getValidationMessage } from '../utils/cartValidation';
+import { KIT_PRODUCT_ID } from '../constants/cartRules';
+import { cancelReservation } from '../api/flai';
 import colors from '../constants/colors';
 import theme from '../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -83,6 +85,9 @@ export default function CheckoutScreen() {
     discountNivel,
     discountEspeciales,
     totalNetos,
+    shippingCost,
+    shipping,
+    setShippingProvince,
     clearCart,
   } = useCart();
   const reserveId = route.params?.reserveId ?? null;
@@ -98,15 +103,32 @@ export default function CheckoutScreen() {
 
   useEffect(() => {
     if (user && !formPreFilled) {
-      setForm(formFromUser(user));
+      const prefilled = formFromUser(user);
+      setForm(prefilled);
       setFormPreFilled(true);
+      if (prefilled.state) {
+        setShippingProvince(prefilled.state);
+      }
     }
-  }, [user, formPreFilled]);
+  }, [user, formPreFilled, setShippingProvince]);
+
+  // Cancel FLAI reservation if user leaves checkout without completing order
+  useEffect(() => {
+    return () => {
+      if (reserveId && !success) {
+        cancelReservation(reserveId).catch(() => {});
+      }
+    };
+  }, [reserveId, success]);
 
   const updateForm = useCallback((field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => ({ ...prev, [field]: undefined }));
-  }, []);
+    // Sync province selection into CartContext for shipping calculation
+    if (field === 'state') {
+      setShippingProvince(value);
+    }
+  }, [setShippingProvince]);
 
   useFocusEffect(
     useCallback(() => {
@@ -138,7 +160,7 @@ export default function CheckoutScreen() {
       email: form.email.trim(),
       phone: form.phone.trim(),
     };
-    const shipping = {
+    const shippingAddress = {
       first_name: form.firstName.trim(),
       last_name: form.lastName.trim(),
       address_1: form.address.trim(),
@@ -156,7 +178,7 @@ export default function CheckoutScreen() {
       payment_method_title: 'Transferencia bancaria',
       set_paid: false,
       billing,
-      shipping,
+      shipping: shippingAddress,
       line_items,
     };
     if (totalDiscount > 0) {
@@ -167,13 +189,23 @@ export default function CheckoutScreen() {
         },
       ];
     }
+    // Agregar linea de envio si aplica costo
+    if (shippingCost > 0) {
+      payload.shipping_lines = [
+        {
+          method_id: 'flat_rate',
+          method_title: 'Envio a domicilio',
+          total: shippingCost.toFixed(2),
+        },
+      ];
+    }
     if (reserveId != null && reserveId !== '') {
       payload.meta_data = [
         { key: '_cel_external_order_id', value: String(reserveId) },
       ];
     }
     return payload;
-  }, [form, cartItems, reserveId, user?.customerId, totalDiscount]);
+  }, [form, cartItems, reserveId, user?.customerId, totalDiscount, shippingCost]);
 
   const handleConfirm = useCallback(async () => {
     if (cartItems.length === 0) {
@@ -204,6 +236,26 @@ export default function CheckoutScreen() {
         clearCart();
         setOrderId(res.data.id != null ? res.data.id : '');
         setSuccess(true);
+
+        // Update customer meta: free shipping timer + kit purchase (if applicable)
+        if (user?.customerId) {
+          const metaUpdates = [
+            { key: '_free_shipping_until', value: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString() },
+          ];
+          if (!user.hasBoughtKit) {
+            const hadKit = cartItems.some(item => item.product.id === KIT_PRODUCT_ID);
+            if (hadKit) {
+              metaUpdates.push(
+                { key: 'has_bought_kit', value: 'yes' },
+                { key: '_kit_last_purchase_date', value: new Date().toISOString() },
+              );
+            }
+          }
+          updateCustomer(user.customerId, { meta_data: metaUpdates }).catch(() => {
+            // Silently fail - refreshUserData will sync on next login
+          });
+        }
+
         refreshUserData?.();
       } else {
         Alert.alert(
@@ -262,7 +314,9 @@ export default function CheckoutScreen() {
     );
   }
 
-  const totalFormatted = formatPrice((totalConDescuento ?? totalPrice ?? 0).toFixed(2));
+  const baseTotal = totalConDescuento ?? totalPrice ?? 0;
+  const grandTotal = baseTotal + (shippingCost ?? 0);
+  const totalFormatted = formatPrice(grandTotal.toFixed(2));
   const subtotalFormatted = formatPrice((subtotalOriginal ?? 0).toFixed(2));
 
   return (
@@ -341,7 +395,13 @@ export default function CheckoutScreen() {
             )}
             <View style={styles.summaryLine}>
               <Text style={styles.summaryLineLabel}>Envío</Text>
-              <Text style={styles.summaryLineValueMuted}>Por calcular</Text>
+              {shipping.isFree ? (
+                <Text style={styles.shippingFreeValue}>Gratis</Text>
+              ) : shipping.label === 'Por calcular' ? (
+                <Text style={styles.summaryLineValueMuted}>Por calcular</Text>
+              ) : (
+                <Text style={styles.summaryLineValue}>{shipping.label}</Text>
+              )}
             </View>
             <View style={styles.summaryTotalRow}>
               <Text style={styles.summaryTotalLabel}>Total</Text>
@@ -583,6 +643,11 @@ const styles = StyleSheet.create({
   summaryLineValueMuted: {
     fontSize: 14,
     color: colors.gray,
+  },
+  shippingFreeValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.success,
   },
   summaryTotalRow: {
     flexDirection: 'row',

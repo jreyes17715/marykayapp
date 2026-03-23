@@ -171,6 +171,14 @@ export async function getOrdersByCustomer(customerId, page = 1) {
   }
 }
 
+export function updateOrder(orderId, data) {
+  return request(() => woocommerce.put(`/orders/${orderId}`, data));
+}
+
+export function getOrderById(orderId) {
+  return request(() => woocommerce.get(`/orders/${orderId}`));
+}
+
 // ——— Autenticación JWT (WordPress) ———
 
 function stripHtmlFromMessage(html) {
@@ -307,6 +315,14 @@ export function getCustomers() {
   return request(() =>
     woocommerce.get('/customers', { params: { role: 'all', per_page: 100 } })
   );
+}
+
+export function updateCustomer(customerId, data) {
+  return request(() => woocommerce.put(`/customers/${customerId}`, data));
+}
+
+export function createCustomer(customerData) {
+  return request(() => woocommerce.post('/customers', customerData));
 }
 
 // ——— Helpers ———

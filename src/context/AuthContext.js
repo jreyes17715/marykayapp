@@ -42,6 +42,7 @@ async function buildUserFromToken(token, initialEmail) {
   if (customer) {
     const metaData = customer.meta_data || [];
     const { level: discountLevel, rate: discountRate } = buildDiscountLevel(metaData);
+    const freeShippingUntil = getUserMeta(metaData, '_free_shipping_until') || null;
     const user = {
       id: wpUser.id,
       customerId: customer.id,
@@ -65,6 +66,8 @@ async function buildUserFromToken(token, initialEmail) {
       overridePorcentaje: Number(getUserMeta(metaData, '_nivelpro_override_porcentaje')) || 0,
       registeredDate: customer.date_created || '',
       salesCurrentMonth: 0,
+      freeShippingUntil,
+      hasFreeShipping: freeShippingUntil != null && new Date(freeShippingUntil) > new Date(),
     };
     return { success: true, user };
   }
@@ -92,6 +95,8 @@ async function buildUserFromToken(token, initialEmail) {
     overridePorcentaje: 0,
     registeredDate: '',
     salesCurrentMonth: 0,
+    freeShippingUntil: null,
+    hasFreeShipping: false,
   };
   return { success: true, user };
 }
