@@ -1,15 +1,19 @@
 module.exports = function (api) {
-  // Cache per NODE_ENV so test and non-test builds are separate.
   api.cache.using(() => process.env.NODE_ENV);
-  // Disable the react-native-reanimated Babel plugin in test environments
-  // to avoid the missing react-native-worklets/plugin dependency.
   const isTest = process.env.NODE_ENV === 'test';
-  return {
-    presets: [
-      [
-        'expo/internal/babel-preset',
-        isTest ? { reanimated: false } : {},
+
+  if (isTest) {
+    // In test: use internal preset with reanimated disabled
+    // to avoid missing react-native-worklets/plugin
+    return {
+      presets: [
+        ['expo/internal/babel-preset', { reanimated: false }],
       ],
-    ],
+    };
+  }
+
+  // In dev/prod: standard Expo preset (used by Metro)
+  return {
+    presets: ['babel-preset-expo'],
   };
 };
