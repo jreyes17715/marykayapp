@@ -11,7 +11,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { getProducts, getCategories } from '../api/woocommerce';
 import BannerCarousel from '../components/BannerCarousel';
-import CategoryList from '../components/CategoryList';
+import TwoTierCategoryNav from '../components/TwoTierCategoryNav';
 import ProductCard from '../components/ProductCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { PREMIO_PRODUCT_ID } from '../constants/cartRules';
@@ -20,7 +20,7 @@ import theme from '../constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PAD = 16;
-const CARD_WIDTH = (SCREEN_WIDTH - PAD * 2 - 12) / 2;
+const CARD_WIDTH = SCREEN_WIDTH - PAD * 2;
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -29,6 +29,8 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedParentId, setSelectedParentId] = useState(null);
+  const [selectedSubId, setSelectedSubId] = useState(null);
 
   const loadData = useCallback(async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
@@ -67,12 +69,29 @@ export default function HomeScreen() {
     loadData();
   }, [loadData]);
 
-  const handleSelectCategory = useCallback(
-    (category) => {
-      navigation.navigate('Tienda', {
-        screen: 'Store',
-        params: { categoryId: category.id },
-      });
+  const handleSelectParent = useCallback(
+    (parentId) => {
+      setSelectedParentId(parentId);
+      setSelectedSubId(null);
+      if (parentId != null) {
+        navigation.navigate('Tienda', {
+          screen: 'Store',
+          params: { categoryId: parentId },
+        });
+      }
+    },
+    [navigation]
+  );
+
+  const handleSelectSub = useCallback(
+    (subId) => {
+      setSelectedSubId((prev) => (prev === subId ? null : subId));
+      if (subId != null) {
+        navigation.navigate('Tienda', {
+          screen: 'Store',
+          params: { categoryId: subId },
+        });
+      }
     },
     [navigation]
   );
@@ -129,7 +148,15 @@ export default function HomeScreen() {
       <BannerCarousel />
 
       <Text style={styles.sectionTitle}>Categorías</Text>
-      <CategoryList categories={categories} onSelectCategory={handleSelectCategory} />
+      <View style={styles.categoryNavWrapper}>
+        <TwoTierCategoryNav
+          categories={categories}
+          selectedParentId={selectedParentId}
+          selectedSubId={selectedSubId}
+          onSelectParent={handleSelectParent}
+          onSelectSub={handleSelectSub}
+        />
+      </View>
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Productos Destacados</Text>
@@ -192,6 +219,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingHorizontal: PAD,
   },
+  categoryNavWrapper: {
+    paddingHorizontal: PAD,
+    marginBottom: 16,
+  },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -205,10 +236,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     paddingHorizontal: PAD,
-    justifyContent: 'space-between',
   },
   gridItem: {
     width: CARD_WIDTH,

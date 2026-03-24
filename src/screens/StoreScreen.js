@@ -19,6 +19,7 @@ import {
 } from '../api/woocommerce';
 import ProductCard from '../components/ProductCard';
 import LoadingSpinner from '../components/LoadingSpinner';
+import TwoTierCategoryNav from '../components/TwoTierCategoryNav';
 import { PREMIO_PRODUCT_ID } from '../constants/cartRules';
 import colors from '../constants/colors';
 import theme from '../constants/theme';
@@ -33,7 +34,7 @@ const PAD = 16;
 const GAP = 8;
 const PER_PAGE = 20;
 const DEBOUNCE_MS = 500;
-const ITEM_WIDTH = (SCREEN_WIDTH - PAD * 2 - GAP) / 2;
+const ITEM_WIDTH = SCREEN_WIDTH - PAD * 2;
 
 export default function StoreScreen() {
   const route = useRoute();
@@ -41,6 +42,7 @@ export default function StoreScreen() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(1);
@@ -63,7 +65,9 @@ export default function StoreScreen() {
 
   const fetchProducts = useCallback(
     async (pageNum = 1, append = false, overrideCategoryId = undefined) => {
-      const categoryId = overrideCategoryId !== undefined ? overrideCategoryId : selectedCategoryId;
+      // Subcategory takes precedence over parent when both are set
+      const effectiveId = selectedSubcategoryId ?? selectedCategoryId;
+      const categoryId = overrideCategoryId !== undefined ? overrideCategoryId : effectiveId;
       const query = searchQuery.trim();
 
       if (query) {
@@ -116,7 +120,7 @@ export default function StoreScreen() {
         setHasMore(false);
       }
     },
-    [searchQuery, selectedCategoryId]
+    [searchQuery, selectedCategoryId, selectedSubcategoryId]
   );
 
   const loadInitial = useCallback(async () => {
@@ -143,7 +147,7 @@ export default function StoreScreen() {
     setError(null);
     fetchProducts(1, false).then(() => setLoading(false));
     setPage(1);
-  }, [searchQuery, selectedCategoryId]);
+  }, [searchQuery, selectedCategoryId, selectedSubcategoryId]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -162,6 +166,13 @@ export default function StoreScreen() {
   }, []);
 
   useEffect(() => {
+    if (selectedSubcategoryId != null) {
+      const sub = categories.find((c) => c.id === selectedSubcategoryId);
+      if (sub) {
+        navigation.setOptions({ headerTitle: sub.name });
+        return;
+      }
+    }
     if (selectedCategoryId == null) {
       navigation.setOptions({ headerTitle: 'Mary Kay' });
       return;
@@ -169,7 +180,7 @@ export default function StoreScreen() {
     const cat = categories.find((c) => c.id === selectedCategoryId);
     const title = cat?.name || initialCategoryName || 'Mary Kay';
     navigation.setOptions({ headerTitle: title });
-  }, [selectedCategoryId, categories, initialCategoryName, navigation]);
+  }, [selectedCategoryId, selectedSubcategoryId, categories, initialCategoryName, navigation]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -197,6 +208,13 @@ export default function StoreScreen() {
 
   const handleSelectCategory = useCallback((categoryId) => {
     setSelectedCategoryId(categoryId);
+    setSelectedSubcategoryId(null);
+    setPage(1);
+    setHasMore(true);
+  }, []);
+
+  const handleSelectSub = useCallback((subId) => {
+    setSelectedSubcategoryId((prev) => (prev === subId ? null : subId));
     setPage(1);
     setHasMore(true);
   }, []);
@@ -223,40 +241,12 @@ export default function StoreScreen() {
             onSubmitEditing={() => Keyboard.dismiss()}
           />
         </View>
-        <FlatList
-          data={[{ id: 'all', name: 'Todos' }, ...categories]}
-          horizontal
-          keyExtractor={(item, index) => (item.id === 'all' ? 'all' : `cat-${item.id}-${index}`)}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesScroll}
-          renderItem={({ item }) => {
-            const isAll = item.id === 'all';
-            const isSelected = isAll
-              ? selectedCategoryId === null
-              : selectedCategoryId === item.id;
-            return (
-              <TouchableOpacity
-                style={[
-                  styles.chip,
-                  isSelected && styles.chipSelected,
-                ]}
-                onPress={() =>
-                  handleSelectCategory(isAll ? null : item.id)
-                }
-                activeOpacity={0.8}
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    isSelected && styles.chipTextSelected,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {item.name || 'Todos'}
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
+        <TwoTierCategoryNav
+          categories={categories}
+          selectedParentId={selectedCategoryId}
+          selectedSubId={selectedSubcategoryId}
+          onSelectParent={handleSelectCategory}
+          onSelectSub={handleSelectSub}
         />
       </View>
     );
@@ -264,7 +254,9 @@ export default function StoreScreen() {
     searchInput,
     categories,
     selectedCategoryId,
+    selectedSubcategoryId,
     handleSelectCategory,
+    handleSelectSub,
   ]);
 
   const renderItem = useCallback(
@@ -334,12 +326,10 @@ export default function StoreScreen() {
         data={products}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
-        numColumns={2}
-        key="grid"
+        key="list"
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmpty}
         ListFooterComponent={renderFooter}
-        columnWrapperStyle={styles.columnWrapper}
         contentContainerStyle={[
           styles.listContent,
           products.length === 0 && styles.listContentEmpty,
@@ -370,9 +360,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerContent: {
-    paddingHorizontal: PAD,
     paddingTop: 12,
     paddingBottom: 16,
+    marginHorizontal: -PAD,
     backgroundColor: colors.background,
   },
   searchRow: {
@@ -381,6 +371,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.lightGray,
     borderRadius: theme.borderRadius.input,
     paddingHorizontal: 12,
+    marginHorizontal: PAD,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E0E0E0',
@@ -395,28 +386,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.darkGray,
   },
-  categoriesScroll: {
-    paddingBottom: 4,
-  },
-  chip: {
-    backgroundColor: colors.lightGray,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: theme.borderRadius.pill,
-    marginRight: 10,
-  },
-  chipSelected: {
-    backgroundColor: colors.primary,
-  },
-  chipText: {
-    fontSize: 14,
-    color: colors.darkGray,
-    fontWeight: '500',
-    maxWidth: 120,
-  },
-  chipTextSelected: {
-    color: colors.white,
-  },
   listContent: {
     paddingHorizontal: PAD,
     paddingBottom: 24,
@@ -424,12 +393,9 @@ const styles = StyleSheet.create({
   listContentEmpty: {
     flexGrow: 1,
   },
-  columnWrapper: {
-    justifyContent: 'space-between',
-    marginBottom: GAP,
-  },
   itemWrapper: {
     width: ITEM_WIDTH,
+    marginBottom: GAP,
   },
   footer: {
     paddingVertical: 20,
