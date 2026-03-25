@@ -102,6 +102,14 @@ export default function TwoTierCategoryNav({
         }
         accessibilityState={{ selected: isSelected }}
       >
+        {!isAll && (
+          <Feather
+            name="grid"
+            size={14}
+            color={isSelected ? colors.white : colors.darkGray}
+            style={styles.parentIcon}
+          />
+        )}
         <Text
           style={[styles.parentChipText, isSelected && styles.parentChipTextSelected]}
           numberOfLines={1}
@@ -132,6 +140,12 @@ export default function TwoTierCategoryNav({
         accessibilityLabel={`Subcategoría ${item.name}`}
         accessibilityState={{ selected: isSelected }}
       >
+        <Feather
+          name="tag"
+          size={13}
+          color={isSelected ? colors.primary : colors.darkGray}
+          style={styles.subIcon}
+        />
         <Text
           style={[styles.subChipText, isSelected && styles.subChipTextSelected]}
           numberOfLines={1}
@@ -211,6 +225,12 @@ const styles = StyleSheet.create({
   chevron: {
     marginLeft: 4,
   },
+  parentIcon: {
+    marginRight: 6,
+  },
+  subIcon: {
+    marginRight: 6,
+  },
 
   // ── Subcategory row ──────────────────────────────────────
   subRowContainer: {
@@ -224,6 +244,8 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   subChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     minHeight: 44,
     justifyContent: 'center',
     backgroundColor: colors.white,

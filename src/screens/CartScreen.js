@@ -17,6 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { getProductImage, formatPrice, stripHtml, getProductById } from '../api/woocommerce';
+import OrderSummaryCard from '../components/OrderSummaryCard';
 import {
   FLAI_BYPASS,
   checkAvailability,
@@ -74,6 +75,7 @@ export default function CartScreen() {
   const [addingKit, setAddingKit] = useState(false);
   const [checkingFlai, setCheckingFlai] = useState(false);
   const [stockErrorMsg, setStockErrorMsg] = useState(null);
+  const [bottomHeight, setBottomHeight] = useState(320);
   const timeoutRef = useRef(null);
 
   const premioTotal = useMemo(
@@ -412,7 +414,7 @@ export default function CartScreen() {
         data={cartItems}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
-        contentContainerStyle={[styles.listContent, { paddingBottom: 280 }]}
+        contentContainerStyle={[styles.listContent, { paddingBottom: bottomHeight + 24 }]}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           user?.hasFreeShipping
@@ -442,69 +444,21 @@ export default function CartScreen() {
         </View>
       )}
 
-      <View style={[styles.fixedBottom, { paddingBottom: Math.max(24, insets.bottom) }]}>
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Subtotal</Text>
-            <Text style={styles.summaryValue}>
-              {formatPrice(subtotalOriginal.toFixed(2))}
-            </Text>
-          </View>
-          {user && discountNivel && discountNivel.monto > 0 && (
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>
-                Descuento consultora ({discountNivel.porcentaje}%)
-              </Text>
-              <Text style={styles.discountValue}>
-                -{formatPrice(discountNivel.monto.toFixed(2))}
-              </Text>
-            </View>
-          )}
-          {user &&
-            discountEspeciales.map((d, idx) => (
-              <View key={`especial-${d.porcentaje}-${idx}`} style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>
-                  Descuento especial ({d.porcentaje}%)
-                </Text>
-                <Text style={styles.discountValue}>
-                  -{formatPrice(d.monto.toFixed(2))}
-                </Text>
-              </View>
-            ))}
-          {user && totalNetos > 0 && (
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Productos a precio neto</Text>
-              <Text style={styles.summaryValue}>
-                {formatPrice(totalNetos.toFixed(2))}
-              </Text>
-            </View>
-          )}
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Envío</Text>
-            {shipping.isFree ? (
-              <Text style={styles.shippingFree}>Gratis</Text>
-            ) : shipping.label === 'Por calcular' ? (
-              <Text style={styles.shippingPlaceholder}>Por calcular</Text>
-            ) : (
-              <Text style={styles.summaryValue}>{shipping.label}</Text>
-            )}
-          </View>
-          {!shipping.isFree && (
-            <Text style={styles.shippingHint}>
-              Envio gratis en compras +RD$60,000
-            </Text>
-          )}
-          <View style={styles.separator} />
-          <View style={styles.summaryRow}>
-            <Text style={styles.totalLabel}>Total con descuentos</Text>
-            <Text style={styles.totalValue}>
-              {formatPrice((totalConDescuento + shippingCost).toFixed(2))}
-            </Text>
-          </View>
-          <Text style={styles.itemCount}>
-            {totalItems} {totalItems === 1 ? 'producto' : 'productos'}
-          </Text>
-        </View>
+      <View
+        style={[styles.fixedBottom, { paddingBottom: Math.max(24, insets.bottom) }]}
+        onLayout={(e) => setBottomHeight(e.nativeEvent.layout.height)}
+      >
+        <OrderSummaryCard
+          subtotalOriginal={subtotalOriginal}
+          totalConDescuento={totalConDescuento}
+          discountNivel={user ? discountNivel : null}
+          discountEspeciales={user ? discountEspeciales : []}
+          totalNetos={user ? totalNetos : 0}
+          shipping={shipping}
+          shippingCost={shippingCost}
+          totalItems={totalItems}
+          showFreeShippingHint
+        />
 
         <TouchableOpacity
           style={[styles.checkoutBtn, !isValid && styles.checkoutBtnDisabled]}

@@ -86,3 +86,30 @@ npm run android  # Abrir en emulador Android
 npm run ios      # Abrir en simulador iOS
 npm run web      # Vista web
 ```
+
+## Memory Protocol — OBLIGATORIO PARA TODOS LOS AGENTES
+
+### Antes de ejecutar cualquier tarea:
+1. LEE memory/shared/business-rules.md (reglas de negocio vigentes)
+2. LEE el archivo de patterns/criteria de TU rol:
+   - Planner       → memory/planner/decisions.md
+   - Implementador  → memory/implementador/patterns.md
+   - Reviewer       → memory/reviewer/criteria.md
+   - UI-UX          → memory/ui-ux/components-registry.md
+   - Optimizador    → memory/optimizador/baselines.md
+   - Documentador   → memory/documentador/coverage-map.md
+3. LEE memory/implementador/errors.md (errores conocidos — aplica a todos)
+
+### Después de completar cualquier tarea:
+1. ESCRIBE en el log de TU rol (execution-log.md, reviews-log.md, etc.)
+   Formato obligatorio:
+   ## YYYY-MM-DD — [Módulo/Feature]
+   - Tarea: qué se hizo
+   - Resultado: aprobado/rechazado/parcial
+   - Tiempo: duración real
+   - Aprendizaje: qué se descubrió (si aplica)
+
+2. Si encontraste un ERROR nuevo → agregar a memory/implementador/errors.md
+3. Si se tomó una DECISIÓN arquitectónica → agregar a memory/planner/decisions.md
+4. Si se creó un COMPONENTE nuevo → agregar a memory/ui-ux/components-registry.md
+5. Si se estableció un PATRÓN nuevo → agregar a memory/implementador/patterns.md

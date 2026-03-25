@@ -16,6 +16,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { createOrder, getProductImage, formatPrice, stripHtml, updateCustomer } from '../api/woocommerce';
 import { getProductPrice } from '../utils/helpers';
+import OrderSummaryCard from '../components/OrderSummaryCard';
 import { validarCarrito, getValidationMessage } from '../utils/cartValidation';
 import { KIT_PRODUCT_ID } from '../constants/cartRules';
 import { cancelReservation } from '../api/flai';
@@ -359,54 +360,16 @@ export default function CheckoutScreen() {
               </View>
             ))}
             <View style={styles.summaryDivider} />
-            <View style={styles.summaryLine}>
-              <Text style={styles.summaryLineLabel}>Subtotal (precios originales)</Text>
-              <Text style={styles.summaryLineValue}>{subtotalFormatted}</Text>
-            </View>
-            {user && discountNivel && discountNivel.monto > 0 && (
-              <View style={styles.summaryLine}>
-                <Text style={styles.summaryLineLabel}>
-                  Descuento consultora ({discountNivel.porcentaje}%)
-                </Text>
-                <Text style={styles.summaryDiscountValue}>
-                  -{formatPrice(discountNivel.monto.toFixed(2))}
-                </Text>
-              </View>
-            )}
-            {user &&
-              discountEspeciales &&
-              discountEspeciales.map((d, idx) => (
-                <View key={`especial-${d.porcentaje}-${idx}`} style={styles.summaryLine}>
-                  <Text style={styles.summaryLineLabel}>
-                    Descuento especial ({d.porcentaje}%)
-                  </Text>
-                  <Text style={styles.summaryDiscountValue}>
-                    -{formatPrice(d.monto.toFixed(2))}
-                  </Text>
-                </View>
-              ))}
-            {user && totalNetos > 0 && (
-              <View style={styles.summaryLine}>
-                <Text style={styles.summaryLineLabel}>Productos a precio neto</Text>
-                <Text style={styles.summaryLineValue}>
-                  {formatPrice(totalNetos.toFixed(2))}
-                </Text>
-              </View>
-            )}
-            <View style={styles.summaryLine}>
-              <Text style={styles.summaryLineLabel}>Envío</Text>
-              {shipping.isFree ? (
-                <Text style={styles.shippingFreeValue}>Gratis</Text>
-              ) : shipping.label === 'Por calcular' ? (
-                <Text style={styles.summaryLineValueMuted}>Por calcular</Text>
-              ) : (
-                <Text style={styles.summaryLineValue}>{shipping.label}</Text>
-              )}
-            </View>
-            <View style={styles.summaryTotalRow}>
-              <Text style={styles.summaryTotalLabel}>Total</Text>
-              <Text style={styles.summaryTotalValue}>{totalFormatted}</Text>
-            </View>
+            <OrderSummaryCard
+              subtotalOriginal={subtotalOriginal}
+              totalConDescuento={totalConDescuento}
+              discountNivel={user ? discountNivel : null}
+              discountEspeciales={user ? discountEspeciales : []}
+              totalNetos={user ? totalNetos : 0}
+              shipping={shipping}
+              shippingCost={shippingCost}
+              totalItems={0}
+            />
           </View>
         )}
 
