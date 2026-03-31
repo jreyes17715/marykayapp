@@ -1,8 +1,8 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert, RefreshControl, ActivityIndicator } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { formatPrice } from '../utils/helpers';
-import { getOrderById, updateOrder } from '../api/woocommerce';
+import { getOrderById, updateOrder, getOrderNotes } from '../api/woocommerce';
 import colors from '../constants/colors';
 import theme from '../constants/theme';
 
@@ -34,7 +34,43 @@ function fechaLarga(dateStr) {
   });
 }
 
-function StatusTimeline({ currentStatus }) {
+/** Maps WooCommerce note display names to status slugs. */
+const NOTE_STATUS_MAP = {
+  'pending payment': 'pending',
+  'pending': 'pending',
+  'on hold': 'on-hold',
+  'on-hold': 'on-hold',
+  'processing': 'processing',
+  'completed': 'completed',
+  'cancelled': 'cancelled',
+  'refunded': 'refunded',
+  'failed': 'failed',
+};
+
+/**
+ * Parses WooCommerce order notes to extract timestamps for each status change.
+ * Notes have format: "Order status changed from X to Y" (EN) or "Estado del pedido cambiado de X a Y" (ES).
+ */
+function parseStatusTimestamps(notes) {
+  const timestamps = {};
+  const regexEN = /status changed from .+ to (.+)/i;
+  const regexES = /estado .+ cambiado de .+ a (.+)/i;
+  for (const note of notes) {
+    if (note.customer_note) continue;
+    const text = note.note || '';
+    const match = text.match(regexEN) || text.match(regexES);
+    if (match) {
+      const raw = match[1].trim().toLowerCase().replace(/\.$/, '');
+      const status = NOTE_STATUS_MAP[raw] || raw.replace(/\s+/g, '-');
+      if (!timestamps[status]) {
+        timestamps[status] = note.date_created;
+      }
+    }
+  }
+  return timestamps;
+}
+
+function StatusTimeline({ currentStatus, statusTimestamps, orderDate }) {
   const currentIdx = STATUS_FLOW.indexOf(currentStatus);
   const isFinalNegative = currentStatus === 'cancelled' || currentStatus === 'failed' || currentStatus === 'refunded';
 
@@ -94,6 +130,15 @@ function StatusTimeline({ currentStatus }) {
               ]}>
                 {cfg.description}
               </Text>
+              {(isCompleted || isCurrent) && (
+                <Text style={styles.timelineTimestamp}>
+                  {fechaLarga(
+                    status === 'pending'
+                      ? (statusTimestamps['pending'] || orderDate)
+                      : statusTimestamps[status]
+                  )}
+                </Text>
+              )}
             </View>
           </View>
         );
@@ -107,6 +152,20 @@ export default function OrderTrackingScreen() {
   const [order, setOrder] = useState(route.params?.order);
   const [refreshing, setRefreshing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [statusTimestamps, setStatusTimestamps] = useState({});
+  const [customerNotes, setCustomerNotes] = useState([]);
+
+  const fetchNotes = useCallback(async (orderId) => {
+    const res = await getOrderNotes(orderId);
+    if (res.success && Array.isArray(res.data)) {
+      setStatusTimestamps(parseStatusTimestamps(res.data));
+      setCustomerNotes(res.data.filter((n) => n.customer_note));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (order?.id) fetchNotes(order.id);
+  }, [order?.id, fetchNotes]);
 
   const onRefresh = useCallback(async () => {
     if (!order?.id) return;
@@ -115,8 +174,9 @@ export default function OrderTrackingScreen() {
     if (res.success && res.data) {
       setOrder(res.data);
     }
+    await fetchNotes(order.id);
     setRefreshing(false);
-  }, [order?.id]);
+  }, [order?.id, fetchNotes]);
 
   const handleCancel = useCallback(() => {
     Alert.alert(
@@ -191,7 +251,23 @@ export default function OrderTrackingScreen() {
         <Text style={styles.totalHeader}>{formatPrice(total)}</Text>
       </View>
 
-      <StatusTimeline currentStatus={order.status} />
+      <StatusTimeline
+        currentStatus={order.status}
+        statusTimestamps={statusTimestamps}
+        orderDate={order.date_created}
+      />
+
+      {customerNotes.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Notas del Pedido</Text>
+          {customerNotes.map((note) => (
+            <View key={note.id} style={styles.noteRow}>
+              <Text style={styles.noteDate}>{fechaLarga(note.date_created)}</Text>
+              <Text style={styles.noteText}>{note.note}</Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Productos</Text>
@@ -283,6 +359,7 @@ const styles = StyleSheet.create({
   timelineLabelMuted: { color: colors.gray },
   timelineDesc: { fontSize: 13, color: colors.darkGray, marginTop: 2 },
   timelineDescMuted: { color: '#BBB' },
+  timelineTimestamp: { fontSize: 11, color: colors.gray, marginTop: 3 },
   section: { backgroundColor: colors.white, borderRadius: theme.borderRadius.card, padding: 14, marginTop: 12, ...theme.shadow },
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: colors.secondary, marginBottom: 8 },
   itemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
@@ -306,4 +383,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
   },
   cancelBtnText: { fontSize: 16, fontWeight: '600', color: '#ef4444' },
+  noteRow: { marginBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.lightGray, paddingBottom: 8 },
+  noteDate: { fontSize: 12, color: colors.gray, marginBottom: 2 },
+  noteText: { fontSize: 14, color: colors.secondary },
 });

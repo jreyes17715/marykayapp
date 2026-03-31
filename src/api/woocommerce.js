@@ -179,6 +179,10 @@ export function getOrderById(orderId) {
   return request(() => woocommerce.get(`/orders/${orderId}`));
 }
 
+export function getOrderNotes(orderId) {
+  return request(() => woocommerce.get(`/orders/${orderId}/notes`));
+}
+
 // ——— Autenticación JWT (WordPress) ———
 
 function stripHtmlFromMessage(html) {
