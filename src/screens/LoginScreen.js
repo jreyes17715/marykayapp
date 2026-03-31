@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
   Linking,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
@@ -52,7 +53,15 @@ export default function LoginScreen() {
       await login(user, password);
       // Al cambiar isLoggedIn, AppNavigator muestra MainTabs automáticamente
     } catch (e) {
-      setError(getLoginErrorMessage(e));
+      if (e?.message === 'ACCOUNT_DISABLED') {
+        Alert.alert(
+          'Cuenta Deshabilitada',
+          'Tu cuenta ha sido deshabilitada. Por favor contacta a soporte para mas informacion.',
+          [{ text: 'Entendido' }]
+        );
+      } else {
+        setError(getLoginErrorMessage(e));
+      }
     } finally {
       setLoading(false);
     }
@@ -141,17 +150,6 @@ export default function LoginScreen() {
           <Text style={styles.secondaryBtnText}>Ver Consultoras</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.registerLinkWrap}
-          onPress={() => navigation.navigate('Register')}
-          disabled={loading}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.registerLinkText}>
-            ¿Quiero ser consultora? Regístrate aquí
-          </Text>
-        </TouchableOpacity>
-
         <Text style={styles.footerText}>
           ¿No tienes cuenta? Contacta a tu consultora
         </Text>
@@ -212,15 +210,6 @@ const styles = StyleSheet.create({
   },
   eyeBtn: {
     padding: 8,
-  },
-  registerLinkWrap: {
-    alignSelf: 'center',
-    marginBottom: 24,
-  },
-  registerLinkText: {
-    fontSize: 14,
-    color: '#d11e51',
-    textDecorationLine: 'underline',
   },
   errorText: {
     fontSize: 14,

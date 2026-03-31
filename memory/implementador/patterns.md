@@ -39,3 +39,15 @@
   - Moneda en RD$ (Pesos Dominicanos)
   NUNCA:
   - Mostrar texto en inglés al usuario final
+
+## Patrón: Funciones Puras de Dominio en src/utils/
+- **Contexto:** Logica de negocio sin dependencias de React o red
+- **Regla:**
+  SIEMPRE:
+  - Importar constantes desde src/constants/ (no hardcodear valores)
+  - Usar new Set(Object.values(ENUM)) para validar valores de enum
+  - Para fechas: new Date(year, month, day, h, m, s, ms) para evitar timezone drift
+  - Retornar null (no lanzar) cuando una operacion no aplica (ej. DISABLED sin minimo)
+  NUNCA:
+  - Importar React, hooks o AsyncStorage en archivos de utils puros
+  - Duplicar constantes que ya existen en cartRules.js

@@ -11,7 +11,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { calcularDescuentoUsuario } from '../utils/discounts';
-import { necesitaReactivacion, diasDesdeUltimaCompra } from '../utils/cartValidation';
+import { CONSULTANT_STATES } from '../constants/cartRules';
 import colors from '../constants/colors';
 import theme from '../constants/theme';
 import { Feather } from '@expo/vector-icons';
@@ -89,11 +89,8 @@ export default function ProfileScreen() {
   }, []);
 
   const nivelInfo = useMemo(() => calcularDescuentoUsuario(user), [user]);
-  const reactivation = useMemo(() => necesitaReactivacion(user), [user]);
-  const diasUltimaCompra = useMemo(() => {
-    const d = diasDesdeUltimaCompra(user);
-    return d === Infinity ? null : Math.floor(d);
-  }, [user]);
+  const consultantState = user?.consultantState || CONSULTANT_STATES.NEW;
+  const isPenalized = consultantState === CONSULTANT_STATES.PENALIZED;
 
   const vigenciaFormatted = user?.vigencia50 ? formatVigencia(user.vigencia50) : null;
   const vigenciaDiasRest = user?.vigencia50 ? diasRestantes(user.vigencia50) : null;
@@ -170,35 +167,20 @@ export default function ProfileScreen() {
           styles.card,
           styles.cardEstado,
           {
-            borderLeftColor: user?.hasBoughtKit
-              ? reactivation
+            borderLeftColor: consultantState === CONSULTANT_STATES.NEW
+              ? KIT_PENDIENTE
+              : isPenalized
                 ? REACTIVACION
-                : KIT_COMPRADO
-              : KIT_PENDIENTE,
+                : KIT_COMPRADO,
           },
         ]}
       >
         <Text style={styles.cardTitle}>Estado de Compra</Text>
-        {user?.hasBoughtKit ? (
-          <>
-            <Text style={styles.estadoLine}>✅ Kit Inicial: Comprado</Text>
-            <Text style={styles.estadoSub}>Compra mínima: RD$ 10,000 por pedido</Text>
-            {reactivation && (
-              <Text style={[styles.estadoLine, { color: REACTIVACION }]}>
-                ⚠️ Reactivación requerida: mínimo RD$ 20,000
-              </Text>
-            )}
-            {diasUltimaCompra != null && (
-              <Text style={styles.estadoSub}>
-                Última compra hace {diasUltimaCompra} {diasUltimaCompra === 1 ? 'día' : 'días'}
-              </Text>
-            )}
-          </>
-        ) : (
+        {consultantState === CONSULTANT_STATES.NEW ? (
           <>
             <Text style={styles.estadoLine}>❌ Kit Inicial: Pendiente</Text>
             <Text style={styles.estadoSub}>
-              Tu primera compra debe incluir el Kit Inicial + mínimo RD$ 25,000
+              Tu primera compra debe incluir el Kit Inicial + minimo RD$ 20,000
             </Text>
             <TouchableOpacity
               style={styles.kitButton}
@@ -207,6 +189,23 @@ export default function ProfileScreen() {
             >
               <Text style={styles.kitButtonText}>Comprar Kit Inicial →</Text>
             </TouchableOpacity>
+          </>
+        ) : consultantState === CONSULTANT_STATES.PENALIZED ? (
+          <>
+            <Text style={styles.estadoLine}>✅ Kit Inicial: Comprado</Text>
+            <Text style={[styles.estadoLine, { color: REACTIVACION }]}>
+              ⚠️ Cuenta penalizada: pedido minimo RD$ 20,000
+            </Text>
+          </>
+        ) : consultantState === CONSULTANT_STATES.ACTIVE ? (
+          <>
+            <Text style={styles.estadoLine}>✅ Kit Inicial: Comprado</Text>
+            <Text style={styles.estadoSub}>Compra minima: RD$ 1,000 por pedido</Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.estadoLine}>❌ Cuenta deshabilitada</Text>
+            <Text style={styles.estadoSub}>Contacta a soporte para mas informacion</Text>
           </>
         )}
       </View>

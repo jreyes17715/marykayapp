@@ -5,8 +5,19 @@ import {
   validateToken,
   getCurrentWPUser,
   findCustomerByEmail,
+  getOrdersByCustomer,
+  updateCustomer,
 } from '../api/woocommerce';
 import { getUserMeta } from '../utils/helpers';
+import { CONSULTANT_STATES } from '../constants/cartRules';
+import {
+  getConsultantState,
+  getPreviousQuarterBounds,
+  getQuarterBounds,
+  computeQuarterlyTotal,
+  shouldPenalize,
+  isRewardEligible,
+} from '../utils/consultantState';
 
 const TOKEN_STORAGE_KEY = '@marykay_jwt_token';
 
@@ -43,6 +54,16 @@ async function buildUserFromToken(token, initialEmail) {
     const metaData = customer.meta_data || [];
     const { level: discountLevel, rate: discountRate } = buildDiscountLevel(metaData);
     const freeShippingUntil = getUserMeta(metaData, '_free_shipping_until') || null;
+
+    const consultantStateRaw = getUserMeta(metaData, 'consultant_state') || null;
+    const blockedAt = getUserMeta(metaData, 'blocked_at') || null;
+    const rewardAvailable = parseBool(getUserMeta(metaData, 'reward_available'));
+    const rewardRedeemed = parseBool(getUserMeta(metaData, 'reward_redeemed'));
+
+    const resolvedConsultantState =
+      consultantStateRaw ||
+      getConsultantState({ hasBoughtKit: parseBool(getUserMeta(metaData, 'has_bought_kit')) });
+
     const user = {
       id: wpUser.id,
       customerId: customer.id,
@@ -68,6 +89,11 @@ async function buildUserFromToken(token, initialEmail) {
       salesCurrentMonth: 0,
       freeShippingUntil,
       hasFreeShipping: freeShippingUntil != null && new Date(freeShippingUntil) > new Date(),
+      consultantState: resolvedConsultantState,
+      blockedAt,
+      rewardAvailable,
+      rewardRedeemed,
+      isDisabled: resolvedConsultantState === CONSULTANT_STATES.DISABLED,
     };
     return { success: true, user };
   }
@@ -97,6 +123,11 @@ async function buildUserFromToken(token, initialEmail) {
     salesCurrentMonth: 0,
     freeShippingUntil: null,
     hasFreeShipping: false,
+    consultantState: CONSULTANT_STATES.NEW,
+    blockedAt: null,
+    rewardAvailable: false,
+    rewardRedeemed: false,
+    isDisabled: false,
   };
   return { success: true, user };
 }
@@ -128,16 +159,83 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  const evaluateQuarterlyStatus = useCallback(async (currentUser) => {
+    if (!currentUser?.customerId) return;
+
+    try {
+      // Obtener ordenes del cliente
+      const ordersResult = await getOrdersByCustomer(currentUser.customerId);
+      if (!ordersResult.success || !ordersResult.data) return;
+
+      const orders = ordersResult.data;
+      const { start, end } = getPreviousQuarterBounds();
+      const quarterlyTotal = computeQuarterlyTotal(orders, start, end);
+
+      const metaUpdates = [];
+      let newState = currentUser.consultantState;
+
+      // Evaluar penalizacion trimestral
+      if (currentUser.consultantState === CONSULTANT_STATES.ACTIVE && shouldPenalize(quarterlyTotal)) {
+        newState = CONSULTANT_STATES.PENALIZED;
+        metaUpdates.push({ key: 'consultant_state', value: CONSULTANT_STATES.PENALIZED });
+      }
+
+      // Evaluar elegibilidad de reward (usa trimestre actual)
+      const currentQuarter = getQuarterBounds();
+      const currentQuarterlyTotal = computeQuarterlyTotal(orders, currentQuarter.start, currentQuarter.end);
+
+      if (isRewardEligible(currentQuarterlyTotal, currentUser.rewardRedeemed) && !currentUser.rewardAvailable) {
+        metaUpdates.push({ key: 'reward_available', value: 'yes' });
+      }
+
+      // Actualizar en WooCommerce si hay cambios
+      if (metaUpdates.length > 0) {
+        await updateCustomer(currentUser.customerId, { meta_data: metaUpdates });
+
+        // Actualizar estado local
+        setUser((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            consultantState: newState,
+            rewardAvailable: metaUpdates.some((m) => m.key === 'reward_available') ? true : prev.rewardAvailable,
+          };
+        });
+      }
+    } catch (e) {
+      // Silenciar errores de evaluacion trimestral — no debe bloquear el uso
+      console.log('[AUTH] Error evaluando estado trimestral:', e.message);
+    }
+  }, []);
+
   const login = useCallback(async (username, password) => {
     const result = await loginUser(username, password);
     if (!result.success) {
       throw new Error(result.error || 'Credenciales incorrectas');
     }
     const { token, user_email } = result.data;
+
+    // Construir user para verificar estado antes de persistir
+    const buildResult = await buildUserFromToken(token, user_email);
+    if (!buildResult.success) {
+      throw new Error(buildResult.error);
+    }
+
+    // Bloquear login si la cuenta esta deshabilitada
+    if (buildResult.user.isDisabled) {
+      throw new Error('ACCOUNT_DISABLED');
+    }
+
     await persistToken(token);
-    const userData = await loadUserFromToken(token, user_email);
-    return userData;
-  }, [loadUserFromToken, persistToken]);
+    setUser(buildResult.user);
+
+    // Evaluar estado trimestral en background para usuarios ACTIVE
+    if (buildResult.user.consultantState === CONSULTANT_STATES.ACTIVE) {
+      evaluateQuarterlyStatus(buildResult.user).catch(() => {});
+    }
+
+    return buildResult.user;
+  }, [persistToken, evaluateQuarterlyStatus]);
 
   const logout = useCallback(() => {
     setUser(null);
@@ -172,7 +270,17 @@ export function AuthProvider({ children }) {
         if (cancelled) return;
         if (result.success) {
           try {
-            await loadUserFromToken(token);
+            const buildResult = await buildUserFromToken(token);
+            if (cancelled) return;
+            if (buildResult.success && !buildResult.user.isDisabled) {
+              setUser(buildResult.user);
+              // Evaluar trimestral en background
+              if (buildResult.user.consultantState === CONSULTANT_STATES.ACTIVE) {
+                evaluateQuarterlyStatus(buildResult.user).catch(() => {});
+              }
+            } else {
+              await persistToken(null);
+            }
           } catch (e) {
             await persistToken(null);
           }
@@ -184,7 +292,7 @@ export function AuthProvider({ children }) {
       .catch(() => setIsLoading(false));
 
     return () => { cancelled = true; };
-  }, [loadUserFromToken, persistToken]);
+  }, [evaluateQuarterlyStatus, persistToken]);
 
   const value = {
     user,
@@ -194,6 +302,7 @@ export function AuthProvider({ children }) {
     logout,
     refreshUserData,
     isTokenValid,
+    evaluateQuarterlyStatus,
   };
 
   return (

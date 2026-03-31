@@ -13,7 +13,6 @@ import OrderTrackingScreen from '../screens/OrderTrackingScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
 import CheckoutScreen from '../screens/CheckoutScreen';
 import LoginScreen from '../screens/LoginScreen';
-import RegisterScreen from '../screens/RegisterScreen';
 import ConsultantListScreen from '../screens/ConsultantListScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -256,16 +255,6 @@ function AuthNavigator() {
   return (
     <AuthStack.Navigator screenOptions={{ headerShown: false }}>
       <AuthStack.Screen name="Login" component={LoginScreen} />
-      <AuthStack.Screen
-        name="Register"
-        component={RegisterScreen}
-        options={{
-          headerShown: true,
-          title: 'Registro de Consultora',
-          headerStyle: { backgroundColor: '#FFFFFF' },
-          headerTintColor: '#d11e51',
-        }}
-      />
       <AuthStack.Screen
         name="ConsultantList"
         component={ConsultantListScreen}

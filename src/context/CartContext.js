@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { calcularPrecioFinal } from '../utils/discounts';
 import { calculateShipping } from '../utils/shipping';
 import { useAuth } from './AuthContext';
-import { PREMIO_PRODUCT_ID, PREMIO_THRESHOLD } from '../constants/cartRules';
+import { KIT_PRODUCT_ID, PREMIO_PRODUCT_ID } from '../constants/cartRules';
 import { getProductById } from '../api/woocommerce';
 
 const CART_STORAGE_KEY = '@marykay_cart';
@@ -109,10 +109,11 @@ export function CartProvider({ children }) {
     [cartItems, user]
   );
   const premioProductRef = useRef(null);
+  const kitProductRef = useRef(null);
 
   useEffect(() => {
-    if (!isRestored) return;
-    const shouldHavePremio = totalSinPremio >= PREMIO_THRESHOLD;
+    if (!isRestored || !user) return;
+    const shouldHavePremio = user.rewardAvailable === true && user.rewardRedeemed !== true;
 
     if (shouldHavePremio && !hasPremio) {
       // Auto-add premio
@@ -137,7 +138,7 @@ export function CartProvider({ children }) {
       // Auto-remove premio
       setCartItems((prev) => prev.filter((i) => i.product.id !== PREMIO_PRODUCT_ID));
     }
-  }, [totalSinPremio, hasPremio, isRestored]);
+  }, [user?.rewardAvailable, user?.rewardRedeemed, hasPremio, isRestored]);
 
   const persistCart = useCallback(async (items) => {
     try {
@@ -175,24 +176,48 @@ export function CartProvider({ children }) {
     if (qty < 1) return;
 
     setCartItems((prev) => {
-      const idx = prev.findIndex((item) => item.product.id === product.id);
+      let next = [...prev];
+      const idx = next.findIndex((item) => item.product.id === product.id);
       if (idx >= 0) {
-        const next = [...prev];
-        const newQty = Math.min(prev[idx].quantity + qty, maxQty);
+        const newQty = Math.min(next[idx].quantity + qty, maxQty);
         if (newQty < 1) return prev;
         next[idx] = { ...next[idx], quantity: newQty };
-        return next;
+      } else {
+        next = [...next, { product, quantity: qty }];
       }
-      return [...prev, { product, quantity: qty }];
+
+      // Auto-inyectar kit para consultoras NEW si no esta en el carrito
+      if (user?.consultantState === 'new' && !next.some((i) => i.product.id === KIT_PRODUCT_ID)) {
+        if (kitProductRef.current) {
+          next = [...next, { product: kitProductRef.current, quantity: 1 }];
+        } else {
+          // Cargar kit product async
+          getProductById(KIT_PRODUCT_ID).then((res) => {
+            if (res.success && res.data) {
+              kitProductRef.current = res.data;
+              setCartItems((current) => {
+                if (current.some((i) => i.product.id === KIT_PRODUCT_ID)) return current;
+                return [...current, { product: res.data, quantity: 1 }];
+              });
+            }
+          });
+        }
+      }
+
+      return next;
     });
-  }, []);
+  }, [user?.consultantState]);
 
   const removeFromCart = useCallback((productId) => {
+    // No permitir eliminar el kit para consultoras nuevas
+    if (productId === KIT_PRODUCT_ID && user?.consultantState === 'new') return;
     setCartItems((prev) => prev.filter((item) => item.product.id !== productId));
-  }, []);
+  }, [user?.consultantState]);
 
   const updateQuantity = useCallback((productId, newQuantity) => {
     if (newQuantity == null || newQuantity < 1) {
+      // No permitir eliminar el kit para consultoras nuevas
+      if (productId === KIT_PRODUCT_ID && user?.consultantState === 'new') return;
       removeFromCart(productId);
       return;
     }
@@ -202,12 +227,15 @@ export function CartProvider({ children }) {
       const item = prev[idx];
       const maxQty = getMaxQuantity(item.product);
       const qty = Math.min(newQuantity, maxQty);
-      if (qty < 1) return prev.filter((_, i) => i !== idx);
+      if (qty < 1) {
+        if (productId === KIT_PRODUCT_ID && user?.consultantState === 'new') return prev;
+        return prev.filter((_, i) => i !== idx);
+      }
       const next = [...prev];
       next[idx] = { ...item, quantity: qty };
       return next;
     });
-  }, [removeFromCart]);
+  }, [removeFromCart, user?.consultantState]);
 
   const incrementQuantity = useCallback((productId) => {
     setCartItems((prev) => {
@@ -227,12 +255,16 @@ export function CartProvider({ children }) {
       const idx = prev.findIndex((item) => item.product.id === productId);
       if (idx < 0) return prev;
       const item = prev[idx];
-      if (item.quantity <= 1) return prev.filter((_, i) => i !== idx);
+      if (item.quantity <= 1) {
+        // No permitir eliminar el kit para consultoras nuevas
+        if (productId === KIT_PRODUCT_ID && user?.consultantState === 'new') return prev;
+        return prev.filter((_, i) => i !== idx);
+      }
       const next = [...prev];
       next[idx] = { ...item, quantity: item.quantity - 1 };
       return next;
     });
-  }, []);
+  }, [user?.consultantState]);
 
   const clearCart = useCallback(() => {
     setCartItems([]);

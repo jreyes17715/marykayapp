@@ -53,13 +53,20 @@ Stack: React Native (Expo 54) + JavaScript (sin TypeScript) + WooCommerce API + 
   3. Base - 50%
   4. Producto especifico (meta `_nivelpro_descuento_producto`) sobreescribe el nivel
   5. Precio neto (meta `_es_precio_neto`) = 0% descuento
-- **Minimos de carrito** (en `src/constants/cartRules.js`):
-  - Cliente nuevo: Kit (ID 4994) + RD$25,000
-  - Cliente recurrente: RD$10,000
-  - Reactivacion (+90 dias): RD$20,000
+- **Estados de Consultora** (en `src/utils/consultantState.js`):
+  - `NEW`: no ha comprado kit. Minimo: Kit + RD$20,000
+  - `ACTIVE`: activa. Minimo: RD$1,000 (solo productos seccion 2)
+  - `PENALIZED`: no alcanzo RD$20,000 en trimestre. Minimo: RD$20,000
+  - `DISABLED`: inhabilitada. No puede comprar.
   - Admin/Staff: sin minimo
-- **Producto Kit ID**: 4994 (obligatorio para nuevas consultoras)
-- **Producto Premio ID**: 6694 (oculto en listados)
+- **Minimos de carrito** (en `src/constants/cartRules.js`):
+  - NEW: Kit (ID 4994) + RD$20,000 en productos
+  - ACTIVE: RD$1,000 en productos con descuento (seccion 2)
+  - PENALIZED: RD$20,000
+  - DISABLED: bloqueado
+  - Admin/Staff: sin minimo
+- **Producto Kit ID**: 4994 (obligatorio para consultoras NEW, auto-inyectado, no removible)
+- **Producto Premio ID**: 6694 (reward trimestral, entrega unica por meta de RD$60,000)
 
 ### Persistencia Local
 - `@marykay_jwt_token` → Token JWT en AsyncStorage
@@ -68,7 +75,7 @@ Stack: React Native (Expo 54) + JavaScript (sin TypeScript) + WooCommerce API + 
 ### Navegacion
 - Bottom tabs: Inicio, Tienda, Carrito, Perfil
 - Cada tab tiene su propio stack de navegacion
-- LoginScreen, RegisterScreen y ConsultantListScreen son pantallas fuera de tabs
+- LoginScreen y ConsultantListScreen son pantallas fuera de tabs (RegisterScreen eliminado)
 
 ### Advertencias
 - Variables de entorno configuradas via `.env` + `app.config.js` (credenciales NO hardcodeadas)
@@ -76,7 +83,9 @@ Stack: React Native (Expo 54) + JavaScript (sin TypeScript) + WooCommerce API + 
 - Las notificaciones son estaticas (hardcoded en NotificationsScreen)
 - Los banners son estaticos (hardcoded en BannerCarousel)
 - Envio no calculado (muestra "Por calcular")
-- RegisterScreen tiene formulario pero NO llama API real
+- RegisterScreen fue eliminado (las consultoras se crean por proceso interno)
+- La evaluacion trimestral de penalizacion/reward se ejecuta al login (no hay cron)
+- Los tests en __tests__/ referencian constantes viejas y necesitan actualizarse
 - No hay tests unitarios ni de integracion
 
 ### Comandos
