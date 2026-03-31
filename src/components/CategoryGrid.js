@@ -7,24 +7,19 @@ import CategoryGridCard from './CategoryGridCard';
  * Add entries as new categories appear in the catalog.
  */
 const CATEGORY_ICONS = {
-  // Face
-  'cuidado-facial': 'sun',
-  'maquillaje': 'smile',
-  'base': 'layers',
-  'labios': 'heart',
-  'ojos': 'eye',
-  // Body / fragrance
-  'cuidado-corporal': 'droplet',
-  'fragancias': 'wind',
-  'perfumes': 'wind',
-  // Skin care
-  'hidratacion': 'droplet',
-  'limpieza': 'feather',
-  // Sets / gifts
-  'sets': 'gift',
-  'kits': 'package',
-  'ofertas': 'tag',
-  // Fallback is applied in the component (default prop iconName = 'grid')
+  // Parent categories (from WooCommerce store)
+  'cuidado-de-la-piel': 'face-woman-outline',
+  'maquillaje': 'brush',
+  'fragancia': 'spray',
+  'cuerpo-y-sol': 'lotion-outline',
+  'herramientas-y-accesorios': 'toolbox-outline',
+  'kit': 'package-variant',
+  'sin-categorizar': 'dots-grid',
+  // Common subcategory slugs
+  'labios': 'lipstick',
+  'ojos': 'eye-outline',
+  'rostro': 'palette-outline',
+  // Fallback is applied in the component (default prop iconName = 'dots-grid')
 };
 
 /**
@@ -36,7 +31,7 @@ function resolveIcon(category) {
   if (bySlug) return bySlug;
   const byName = CATEGORY_ICONS[category?.name?.toLowerCase()];
   if (byName) return byName;
-  return 'grid';
+  return 'dots-grid';
 }
 
 /**

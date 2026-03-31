@@ -6,7 +6,7 @@ import {
   StyleSheet,
   Dimensions,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import colors from '../constants/colors';
 import theme from '../constants/theme';
 
@@ -25,13 +25,13 @@ const CARD_WIDTH =
  * ─────
  * @param {object}   category        WooCommerce category object
  * @param {string}   category.name   Category display name
- * @param {string}   [iconName]      Feather icon name (default: 'grid')
+ * @param {string}   [iconName]      MaterialCommunityIcons name (default: 'dots-grid')
  * @param {function} onPress         (category) => void
  * @param {boolean}  [loading]       Show skeleton state
  */
 export default function CategoryGridCard({
   category,
-  iconName = 'grid',
+  iconName = 'dots-grid',
   onPress,
   loading = false,
 }) {
@@ -49,7 +49,7 @@ export default function CategoryGridCard({
     >
       {/* Icon container — light pink circle on white card */}
       <View style={styles.iconCircle}>
-        <Feather name={iconName} size={26} color={colors.primary} />
+        <MaterialCommunityIcons name={iconName} size={30} color="#1a1a2e" />
       </View>
 
       {/* Category name */}
