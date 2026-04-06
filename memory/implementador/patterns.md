@@ -40,6 +40,18 @@
   NUNCA:
   - Mostrar texto en inglés al usuario final
 
+## Patrón: Tests con calcularPrecioFinal interno
+- **Contexto:** Tests de validarCarrito para estados NEW y ACTIVE
+- **Regla:**
+  SIEMPRE:
+  - Construir cart items con `regular_price`, `price` y `meta_data` completos
+  - Calcular precios esperados usando el descuento del usuario (default 50%)
+  - Usar `registeredDate` en el pasado para evitar regla "Mes de Bienvenida"
+  - Buscar tests duplicados en __tests__/ Y src/**/__tests__/
+  NUNCA:
+  - Asumir que totalConDescuento se usa para NEW/ACTIVE (solo PENALIZED lo usa)
+  - Crear cart items sin meta_data (calcularPrecioFinal falla)
+
 ## Patrón: Funciones Puras de Dominio en src/utils/
 - **Contexto:** Logica de negocio sin dependencias de React o red
 - **Regla:**

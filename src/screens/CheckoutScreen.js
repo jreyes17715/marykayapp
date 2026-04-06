@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import * as Crypto from 'expo-crypto';
 import {
   View,
   Text,
@@ -10,6 +11,7 @@ import {
   Platform,
   Alert,
   Image,
+  Modal,
 } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { useCart } from '../context/CartContext';
@@ -21,9 +23,16 @@ import { validarCarrito, getValidationMessage } from '../utils/cartValidation';
 import { KIT_PRODUCT_ID, PREMIO_PRODUCT_ID } from '../constants/cartRules';
 import { getTransitionAfterPurchase, buildMetaUpdatesForTransition } from '../utils/consultantState';
 import { cancelReservation } from '../api/flai';
+import { buildPaymentRequest } from '../api/azul';
+import AzulPaymentWebView from '../components/AzulPaymentWebView';
 import colors from '../constants/colors';
 import theme from '../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const PAYMENT_METHODS = {
+  TRANSFER: 'bacs',
+  CARD: 'azul_card',
+};
 
 const COUNTRY_CODE = 'DO';
 const COUNTRY_LABEL = 'República Dominicana';
@@ -102,6 +111,11 @@ export default function CheckoutScreen() {
   const [errors, setErrors] = useState({});
   const [form, setForm] = useState(initialForm);
   const [formPreFilled, setFormPreFilled] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS.TRANSFER);
+  const [showAzulWebView, setShowAzulWebView] = useState(false);
+  const [azulPaymentData, setAzulPaymentData] = useState(null);
+  // Fix W-2: prevent double submission
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     if (user && !formPreFilled) {
@@ -174,11 +188,12 @@ export default function CheckoutScreen() {
       product_id: product.id,
       quantity,
     }));
+    const isCard = paymentMethod === PAYMENT_METHODS.CARD;
     const payload = {
       customer_id: user?.customerId ?? 0,
-      payment_method: 'bacs',
-      payment_method_title: 'Transferencia bancaria',
-      set_paid: false,
+      payment_method: isCard ? 'azul_card' : 'bacs',
+      payment_method_title: isCard ? 'Pago con tarjeta (AZUL)' : 'Transferencia bancaria',
+      set_paid: isCard,
       billing,
       shipping: shippingAddress,
       line_items,
@@ -207,9 +222,81 @@ export default function CheckoutScreen() {
       ];
     }
     return payload;
-  }, [form, cartItems, reserveId, user?.customerId, totalDiscount, shippingCost]);
+  }, [form, cartItems, reserveId, user?.customerId, totalDiscount, shippingCost, paymentMethod]);
+
+  // Post-order actions shared by both payment flows
+  const handleOrderSuccess = useCallback((orderData) => {
+    clearCart();
+    setOrderId(orderData.id != null ? orderData.id : '');
+    setSuccess(true);
+
+    if (user?.customerId) {
+      const orderTotal = totalConDescuento ?? totalPrice ?? 0;
+      const kitInCart = cartItems.some(item => item.product.id === KIT_PRODUCT_ID);
+      const premioInCart = cartItems.some(item => item.product.id === PREMIO_PRODUCT_ID);
+
+      const metaUpdates = [
+        { key: '_free_shipping_until', value: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString() },
+      ];
+
+      const newState = getTransitionAfterPurchase(
+        user.consultantState,
+        orderTotal,
+        user.hasBoughtKit,
+        kitInCart
+      );
+
+      if (newState) {
+        const transitionMeta = buildMetaUpdatesForTransition(newState, {
+          hasBoughtKit: !user.hasBoughtKit && kitInCart,
+        });
+        metaUpdates.push(...transitionMeta);
+      } else if (!user.hasBoughtKit && kitInCart) {
+        metaUpdates.push({ key: 'has_bought_kit', value: 'yes' });
+      }
+
+      if (premioInCart && user.rewardAvailable) {
+        metaUpdates.push(
+          { key: 'reward_redeemed', value: 'yes' },
+          { key: 'reward_available', value: 'no' },
+        );
+      }
+
+      updateCustomer(user.customerId, { meta_data: metaUpdates }).catch(() => {});
+    }
+
+    refreshUserData?.();
+  }, [clearCart, user, totalConDescuento, totalPrice, cartItems, refreshUserData]);
+
+  // Create WooCommerce order (used by both flows)
+  const submitOrder = useCallback(async (azulMeta) => {
+    const payload = buildOrderPayload();
+    if (azulMeta) {
+      const existingMeta = payload.meta_data || [];
+      payload.meta_data = [
+        ...existingMeta,
+        { key: '_azul_authorization_code', value: azulMeta.AuthorizationCode || '' },
+        { key: '_azul_rrn', value: azulMeta.RRN || '' },
+        { key: '_azul_datetime', value: azulMeta.DateTime || '' },
+        { key: '_azul_order_id', value: azulMeta.AzulOrderId || '' },
+      ];
+    }
+    const res = await createOrder(payload);
+    if (res.success && res.data) {
+      handleOrderSuccess(res.data);
+    } else {
+      Alert.alert(
+        'Error al crear el pedido',
+        res.error || 'No se pudo crear la orden. Intenta de nuevo.'
+      );
+    }
+    return res;
+  }, [buildOrderPayload, handleOrderSuccess]);
 
   const handleConfirm = useCallback(async () => {
+    // Fix W-2: prevent double submission
+    if (submittingRef.current) return;
+
     if (cartItems.length === 0) {
       Alert.alert('Carrito vacío', 'Agrega productos antes de confirmar.');
       return;
@@ -228,69 +315,42 @@ export default function CheckoutScreen() {
       );
       return;
     }
-    setLoading(true);
     setErrors({});
-    try {
-      const payload = buildOrderPayload();
-      const res = await createOrder(payload);
-      setLoading(false);
-      if (res.success && res.data) {
-        clearCart();
-        setOrderId(res.data.id != null ? res.data.id : '');
-        setSuccess(true);
 
-        // Actualizar meta del customer: envio gratis + transiciones de estado
-        if (user?.customerId) {
-          const orderTotal = totalConDescuento ?? totalPrice ?? 0;
-          const kitInCart = cartItems.some(item => item.product.id === KIT_PRODUCT_ID);
-          const premioInCart = cartItems.some(item => item.product.id === PREMIO_PRODUCT_ID);
+    submittingRef.current = true;
 
-          const metaUpdates = [
-            { key: '_free_shipping_until', value: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString() },
-          ];
-
-          // Evaluar transicion de estado post-compra
-          const newState = getTransitionAfterPurchase(
-            user.consultantState,
-            orderTotal,
-            user.hasBoughtKit,
-            kitInCart
-          );
-
-          if (newState) {
-            const transitionMeta = buildMetaUpdatesForTransition(newState, {
-              hasBoughtKit: !user.hasBoughtKit && kitInCart,
-            });
-            metaUpdates.push(...transitionMeta);
-          } else if (!user.hasBoughtKit && kitInCart) {
-            // Kit comprado pero sin transicion (edge case)
-            metaUpdates.push({ key: 'has_bought_kit', value: 'yes' });
-          }
-
-          // Marcar premio como canjeado si estaba en el carrito
-          if (premioInCart && user.rewardAvailable) {
-            metaUpdates.push(
-              { key: 'reward_redeemed', value: 'yes' },
-              { key: 'reward_available', value: 'no' },
-            );
-          }
-
-          updateCustomer(user.customerId, { meta_data: metaUpdates }).catch(() => {});
-        }
-
-        refreshUserData?.();
-      } else {
-        Alert.alert(
-          'Error al crear el pedido',
-          res.error || 'No se pudo crear la orden. Intenta de nuevo.'
-        );
+    // Card payment: build AZUL request and open WebView
+    if (paymentMethod === PAYMENT_METHODS.CARD) {
+      setLoading(true);
+      try {
+        // Fix W-1: use UUID instead of Date.now() for orderNumber uniqueness
+        const orderNumber = `${user?.customerId || 0}-${Crypto.randomUUID().split('-')[0]}`;
+        // Fix C-3: capture grandTotal fresh at confirm time
+        const grandTotalForAzul = (totalConDescuento ?? totalPrice ?? 0) + (shippingCost ?? 0);
+        const paymentData = await buildPaymentRequest(orderNumber, grandTotalForAzul);
+        setAzulPaymentData(paymentData);
+        setShowAzulWebView(true);
+      } catch (e) {
+        Alert.alert('Error', 'No se pudo iniciar el pago con tarjeta. Intenta de nuevo.');
+        submittingRef.current = false;
+      } finally {
+        setLoading(false);
       }
+      return;
+    }
+
+    // Transfer payment: create order directly
+    setLoading(true);
+    try {
+      await submitOrder(null);
     } catch (e) {
-      setLoading(false);
       Alert.alert(
         'Error',
         e?.message || 'No se pudo crear la orden. Intenta de nuevo.'
       );
+    } finally {
+      setLoading(false);
+      submittingRef.current = false;
     }
   }, [
     form,
@@ -298,10 +358,52 @@ export default function CheckoutScreen() {
     user,
     totalConDescuento,
     totalPrice,
-    buildOrderPayload,
-    clearCart,
-    refreshUserData,
+    paymentMethod,
+    shippingCost,
+    submitOrder,
   ]);
+
+  // AZUL WebView callbacks
+  const handleAzulSuccess = useCallback(async (azulResponse) => {
+    if (!azulResponse.AuthorizationCode) {
+      setShowAzulWebView(false);
+      setAzulPaymentData(null);
+      submittingRef.current = false;
+      Alert.alert('Error de Pago', 'El pago no pudo ser verificado. Contacta soporte.');
+      return;
+    }
+    setShowAzulWebView(false);
+    setAzulPaymentData(null);
+    setLoading(true);
+    try {
+      await submitOrder(azulResponse);
+    } catch (e) {
+      Alert.alert('Error', 'El pago fue aprobado pero hubo un error creando la orden. Contacta soporte.');
+    }
+    setLoading(false);
+    submittingRef.current = false;
+  }, [submitOrder]);
+
+  const handleAzulDeclined = useCallback((azulResponse) => {
+    setShowAzulWebView(false);
+    setAzulPaymentData(null);
+    submittingRef.current = false;
+    const msg = azulResponse?.ResponseMessage || 'Tu pago fue rechazado';
+    Alert.alert('Pago Rechazado', `${msg}. Intenta con otra tarjeta o elige transferencia bancaria.`);
+  }, []);
+
+  const handleAzulCancel = useCallback(() => {
+    setShowAzulWebView(false);
+    setAzulPaymentData(null);
+    submittingRef.current = false;
+  }, []);
+
+  const handleAzulError = useCallback((errorMsg) => {
+    setShowAzulWebView(false);
+    setAzulPaymentData(null);
+    submittingRef.current = false;
+    Alert.alert('Error de Pago', errorMsg || 'Ocurrió un error procesando el pago.');
+  }, []);
 
   const goHome = useCallback(() => {
     navigation.navigate('Inicio', { screen: 'Home' });
@@ -493,17 +595,77 @@ export default function CheckoutScreen() {
         {/* Sección 4: Método de pago */}
         <Text style={styles.sectionTitle}>Método de Pago</Text>
         <View style={styles.card}>
-          <View style={styles.paymentRow}>
-            <View style={[styles.radio, styles.radioSelected]} />
-            <Text style={styles.paymentLabel}>Transferencia bancaria</Text>
-          </View>
-          <Text style={styles.paymentNote}>
-            Recibirás las instrucciones de pago una vez confirmado tu pedido
-          </Text>
+          <TouchableOpacity
+            style={styles.paymentOption}
+            onPress={() => setPaymentMethod(PAYMENT_METHODS.TRANSFER)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.paymentRow}>
+              <View style={[
+                styles.radio,
+                paymentMethod === PAYMENT_METHODS.TRANSFER && styles.radioSelected,
+              ]} />
+              <Text style={styles.paymentLabel}>Transferencia bancaria</Text>
+            </View>
+            {paymentMethod === PAYMENT_METHODS.TRANSFER && (
+              <Text style={styles.paymentNote}>
+                Recibirás las instrucciones de pago una vez confirmado tu pedido
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.paymentDivider} />
+
+          <TouchableOpacity
+            style={styles.paymentOption}
+            onPress={() => setPaymentMethod(PAYMENT_METHODS.CARD)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.paymentRow}>
+              <View style={[
+                styles.radio,
+                paymentMethod === PAYMENT_METHODS.CARD && styles.radioSelected,
+              ]} />
+              <Text style={styles.paymentLabel}>Pago con tarjeta</Text>
+            </View>
+            {paymentMethod === PAYMENT_METHODS.CARD && (
+              <View>
+                <Text style={styles.paymentNote}>
+                  Pago seguro procesado por AZUL
+                </Text>
+                <View style={styles.cardLogos}>
+                  <View style={styles.cardBadge}>
+                    <Text style={styles.cardBadgeText}>VISA</Text>
+                  </View>
+                  <View style={styles.cardBadge}>
+                    <Text style={styles.cardBadgeText}>MC</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* AZUL Payment WebView Modal */}
+      <Modal
+        visible={showAzulWebView}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={handleAzulCancel}
+      >
+        {azulPaymentData && (
+          <AzulPaymentWebView
+            paymentData={azulPaymentData}
+            onSuccess={handleAzulSuccess}
+            onDeclined={handleAzulDeclined}
+            onCancel={handleAzulCancel}
+            onError={handleAzulError}
+          />
+        )}
+      </Modal>
 
       <View style={[styles.fixedBottom, { paddingBottom: Math.max(24, insets.bottom) }]}>
         <TouchableOpacity
@@ -513,9 +675,13 @@ export default function CheckoutScreen() {
           activeOpacity={0.8}
         >
           {loading ? (
-            <Text style={styles.confirmBtnText}>Creando pedido...</Text>
+            <Text style={styles.confirmBtnText}>
+              {paymentMethod === PAYMENT_METHODS.CARD ? 'Iniciando pago...' : 'Creando pedido...'}
+            </Text>
           ) : (
-            <Text style={styles.confirmBtnText}>Confirmar Pedido — {totalFormatted}</Text>
+            <Text style={styles.confirmBtnText}>
+              {paymentMethod === PAYMENT_METHODS.CARD ? 'Pagar con Tarjeta' : 'Confirmar Pedido'} — {totalFormatted}
+            </Text>
           )}
         </TouchableOpacity>
       </View>
@@ -720,9 +886,17 @@ const styles = StyleSheet.create({
     color: colors.darkGray,
     flex: 1,
   },
+  paymentOption: {
+    paddingVertical: 4,
+  },
   paymentRow: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  paymentDivider: {
+    height: 1,
+    backgroundColor: '#e5e7eb',
+    marginVertical: 12,
   },
   radio: {
     width: 20,
@@ -746,6 +920,24 @@ const styles = StyleSheet.create({
     color: colors.gray,
     marginTop: 10,
     lineHeight: 18,
+  },
+  cardLogos: {
+    flexDirection: 'row',
+    marginTop: 10,
+    gap: 8,
+  },
+  cardBadge: {
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: '#f9fafb',
+  },
+  cardBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#374151',
   },
   fixedBottom: {
     position: 'absolute',

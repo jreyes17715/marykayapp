@@ -36,6 +36,12 @@ export default {
       FLAI_LOGIN: process.env.FLAI_LOGIN,
       FLAI_PASSWORD: process.env.FLAI_PASSWORD,
       FLAI_BYPASS: process.env.FLAI_BYPASS,
+      AZUL_ENV: process.env.AZUL_ENV,
+      AZUL_MERCHANT_ID: process.env.AZUL_MERCHANT_ID,
+      AZUL_AUTH_KEY: process.env.AZUL_AUTH_KEY,
+      AZUL_MERCHANT_NAME: process.env.AZUL_MERCHANT_NAME,
+      AZUL_MERCHANT_TYPE: process.env.AZUL_MERCHANT_TYPE,
+      AZUL_CURRENCY_CODE: process.env.AZUL_CURRENCY_CODE,
     },
   },
 };

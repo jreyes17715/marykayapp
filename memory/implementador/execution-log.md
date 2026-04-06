@@ -28,8 +28,26 @@
 - Tiempo: ~5 minutos
 - Aprendizaje: Alert no estaba en los imports de react-native en LoginScreen — siempre verificar imports antes de usar APIs de RN. La deteccion ACCOUNT_DISABLED usa comparacion exacta de string e?.message === 'ACCOUNT_DISABLED', que debe coincidir con lo que lanza AuthContext.
 
+## 2026-03-31 — Order tracking dinamico con notas WooCommerce
+- Tarea: Agregar getOrderNotes() a woocommerce.js, parsear timestamps de cambios de estado desde notas del sistema, mostrar timestamps en timeline y seccion de notas al cliente en OrderTrackingScreen
+- Resultado: aprobado
+- Tiempo: ~15 minutos
+- Aprendizaje: WooCommerce order notes pueden estar en ingles ("Order status changed from X to Y") o espanol ("Estado del pedido cambiado de X a Y") segun config del sitio. Se necesitan ambos regex. El status "Pending payment" en notas mapea a slug "pending" (no "pending-payment"). Para el estado initial "pending" no hay nota de cambio — usar order.date_created como fallback.
+
+## 2026-03-31 — Tests: actualizar suite para maquina de estados
+- Tarea: Reescribir 4 archivos de test rotos por la migracion al sistema de estados (NEW/ACTIVE/PENALIZED/DISABLED). Archivos: __tests__/discounts.test.js (agregar assertions nivel), __tests__/cartRules.test.js (imports + constantes nuevas), __tests__/cartValidation.test.js (reescritura completa), src/utils/__tests__/cartValidation.test.js (reescritura completa).
+- Resultado: aprobado — 147/147 tests pasan
+- Tiempo: ~20 minutos
+- Aprendizaje: Existia un archivo duplicado en src/utils/__tests__/cartValidation.test.js que tambien usaba la API legacy — siempre buscar tests en multiples ubicaciones. Para NEW y ACTIVE, validarCarrito calcula totales INTERNAMENTE desde cartItems via calcularPrecioFinal (el param totalConDescuento NO se usa). Solo PENALIZED usa totalConDescuento. Los items de test necesitan regular_price/price/meta_data completos para que calcularPrecioFinal funcione correctamente. Con descuento default 50%, regular_price '40000' => precioFinal 20000.
+
 ## 2026-03-31 — Utils / consultantState
 - Tarea: Crear src/utils/consultantState.js con 11 funciones puras para el sistema de estados de consultora
 - Resultado: aprobado
 - Tiempo: ~10 minutos
 - Aprendizaje: cartRules.js ya tenia todas las constantes necesarias. MIN_AMOUNT_NEW es 20000 (no 25000 como indica RULE-002 del shared business-rules — el valor en codigo es la fuente de verdad). El archivo no requiere React ni AsyncStorage, es logica de dominio pura reutilizable por cualquier capa.
+
+## 2026-04-06 — AZUL Payment Page integration (pago con tarjeta)
+- Tarea: Integrar AZUL Payment Page como metodo de pago alternativo a transferencia bancaria. Crear src/api/azul.js (hash SHA512, UTF-16LE, build params, validate response), src/components/AzulPaymentWebView.js (WebView embebido con form POST auto-submit, intercepta callbacks), actualizar CheckoutScreen con selector de metodo de pago y flujo AZUL via Modal.
+- Resultado: aprobado (post-review con fixes aplicados)
+- Tiempo: ~30 minutos
+- Aprendizaje: expo-crypto digest() retorna ArrayBuffer, necesita conversion manual a hex string. AZUL Payment Page es redirect-based (no API directa) — el patron estandar mobile es WebView embebido. El hash de AZUL usa concatenacion de campos + AuthKey → UTF-16LE → SHA-512 (siguiendo patron del plugin oficial WooCommerce). formatAmount debe usar toFixed(2).replace('.','') en vez de Math.round(*100) para evitar drift IEEE-754. El WebView onNavigationStateChange puede disparar multiples veces para la misma URL — usar useRef como guard. originWhitelist=['*'] es inseguro, usar ['https://*','about:blank']. Siempre resetear refs de control (submittingRef) en todos los callbacks de salida del flujo async.
