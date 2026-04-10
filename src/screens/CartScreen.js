@@ -410,6 +410,14 @@ export default function CartScreen() {
         </View>
       ) : null}
 
+      {user?.restrictionState === 'inactive' && (
+        <View style={styles.inactiveBanner}>
+          <Text style={styles.inactiveBannerText}>
+            Tu cuenta esta inactiva. Tu proxima compra debe ser de minimo RD$20,000 para reactivar tu cuenta.
+          </Text>
+        </View>
+      )}
+
       <FlatList
         data={cartItems}
         renderItem={renderItem}
@@ -828,5 +836,21 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  inactiveBanner: {
+    backgroundColor: '#fef3c7',
+    borderLeftWidth: 4,
+    borderLeftColor: '#f59e0b',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 8,
+    borderRadius: 6,
+  },
+  inactiveBannerText: {
+    color: '#92400e',
+    fontSize: 13,
+    lineHeight: 19,
   },
 });
