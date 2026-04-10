@@ -6,6 +6,8 @@ import {
   MIN_AMOUNT_NEW,
   MIN_AMOUNT_ACTIVE,
   MIN_AMOUNT_PENALIZED,
+  MIN_AMOUNT_INACTIVE,
+  INACTIVE_GRACE_MONTHS,
   QUARTERLY_THRESHOLD,
   REWARD_QUARTERLY_THRESHOLD,
   DISABLED_MONTHS,
@@ -13,6 +15,120 @@ import {
 
 // Conjunto de valores validos para validacion rapida
 const VALID_STATES = new Set(Object.values(CONSULTANT_STATES));
+
+/**
+ * Encuentra una entrada en meta_data de WooCommerce por clave y retorna su valor.
+ *
+ * @param {Array<{ key: string, value: string }>|null} metaData - Array de meta entries
+ * @param {string} key - Clave a buscar
+ * @returns {string|null} Valor encontrado o null
+ */
+export function getUserMeta(metaData, key) {
+  if (!Array.isArray(metaData)) return null;
+  const entry = metaData.find((m) => m.key === key);
+  return entry ? entry.value : null;
+}
+
+/**
+ * Determina si una consultora esta bloqueada por admin.
+ * La flag `ud_is_deactivated` = '1' en meta_data indica bloqueo.
+ * Tiene la maxima prioridad sobre cualquier otro estado.
+ *
+ * @param {object} user - Objeto de usuario con meta_data
+ * @returns {boolean}
+ */
+export function isBlocked(user) {
+  return getUserMeta(user.meta_data, 'ud_is_deactivated') === '1';
+}
+
+/**
+ * Determina si una consultora ACTIVE esta inactiva por no haber realizado
+ * una compra calificada (RD$20,000+) en los ultimos INACTIVE_GRACE_MONTHS meses.
+ *
+ * Logica de diff de meses equivalente al PHP:
+ *   $last_date = new DateTime(date('Y-m-01', intval($last_ts)));
+ *   $now_date  = new DateTime(date('Y-m-01'));
+ *   $diff = $last_date->diff($now_date);
+ *   $meses_diff = ($diff->y * 12) + $diff->m;
+ *
+ * @param {object} user - Objeto de usuario con meta_data y consultantState
+ * @returns {boolean}
+ */
+export function isInactive(user) {
+  const raw = getUserMeta(user.meta_data, '_kit_last_active_purchase_ts');
+
+  if (!raw) {
+    // Sin timestamp: usuarios legacy que ya son ACTIVE no se penalizan
+    const state = getConsultantState(user);
+    return state === CONSULTANT_STATES.INACTIVE;
+  }
+
+  const ts = parseInt(raw, 10);
+  if (isNaN(ts) || ts <= 0) return false;
+
+  const lastDate = new Date(ts * 1000);
+  const now = new Date();
+
+  // Truncar ambas fechas al primer dia del mes (equivalente a 'Y-m-01')
+  const lastFirstOfMonth = new Date(lastDate.getFullYear(), lastDate.getMonth(), 1);
+  const nowFirstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const yearDiff = nowFirstOfMonth.getFullYear() - lastFirstOfMonth.getFullYear();
+  const monthDiff = nowFirstOfMonth.getMonth() - lastFirstOfMonth.getMonth();
+  const totalMonths = yearDiff * 12 + monthDiff;
+
+  return totalMonths > INACTIVE_GRACE_MONTHS;
+}
+
+/**
+ * Evalua si la consultora tiene una restriccion de compra activa.
+ * Prioridad: BLOCKED > INACTIVE > null.
+ * Solo evalua INACTIVE para consultoras en estado ACTIVE o INACTIVE.
+ *
+ * @param {object} user - Objeto de usuario con meta_data y consultantState
+ * @returns {'blocked'|'inactive'|null}
+ */
+export function resolveRestrictionState(user) {
+  if (isBlocked(user)) {
+    return CONSULTANT_STATES.BLOCKED;
+  }
+
+  const state = getConsultantState(user);
+  if (state === CONSULTANT_STATES.ACTIVE || state === CONSULTANT_STATES.INACTIVE) {
+    if (isInactive(user)) {
+      return CONSULTANT_STATES.INACTIVE;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Determina si una consultora debe marcarse como inactiva a partir de su
+ * timestamp de ultima compra calificada.
+ * Replica la logica de isInactive pero recibe el timestamp directamente.
+ *
+ * @param {string|number|null} lastActivePurchaseTs - Unix timestamp (segundos) como string o number
+ * @returns {boolean}
+ */
+export function shouldMarkInactive(lastActivePurchaseTs) {
+  if (!lastActivePurchaseTs) return false;
+
+  const ts = parseInt(lastActivePurchaseTs, 10);
+  if (isNaN(ts) || ts <= 0) return false;
+
+  const lastDate = new Date(ts * 1000);
+  const now = new Date();
+
+  const lastFirstOfMonth = new Date(lastDate.getFullYear(), lastDate.getMonth(), 1);
+  const nowFirstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const yearDiff = nowFirstOfMonth.getFullYear() - lastFirstOfMonth.getFullYear();
+  const monthDiff = nowFirstOfMonth.getMonth() - lastFirstOfMonth.getMonth();
+  const totalMonths = yearDiff * 12 + monthDiff;
+
+  return totalMonths > INACTIVE_GRACE_MONTHS;
+}
 
 /**
  * Deriva el estado de consultora a partir de campos legacy del usuario.
@@ -181,6 +297,10 @@ export function getTransitionAfterPurchase(currentState, orderTotal, hasBoughtKi
     return CONSULTANT_STATES.ACTIVE;
   }
 
+  if (currentState === CONSULTANT_STATES.INACTIVE && orderTotal >= MIN_AMOUNT_INACTIVE) {
+    return CONSULTANT_STATES.ACTIVE;
+  }
+
   return null;
 }
 
@@ -210,6 +330,13 @@ export function buildMetaUpdatesForTransition(newState, extras = {}) {
     meta.push({ key: 'reward_available', value: extras.rewardAvailable ? 'yes' : 'no' });
   }
 
+  // Al reactivar desde INACTIVE, registrar el timestamp de la compra y confirmar kit
+  if (extras.fromInactive) {
+    const nowTs = String(Math.floor(Date.now() / 1000));
+    meta.push({ key: '_kit_last_active_purchase_ts', value: nowTs });
+    meta.push({ key: '_kit_activa_confirmada', value: '1' });
+  }
+
   return meta;
 }
 
@@ -228,7 +355,11 @@ export function getMinimumForState(state) {
       return MIN_AMOUNT_ACTIVE;
     case CONSULTANT_STATES.PENALIZED:
       return MIN_AMOUNT_PENALIZED;
+    case CONSULTANT_STATES.INACTIVE:
+      return MIN_AMOUNT_INACTIVE;
     case CONSULTANT_STATES.DISABLED:
+      return null;
+    case CONSULTANT_STATES.BLOCKED:
       return null;
     default:
       return null;

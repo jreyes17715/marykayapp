@@ -7,6 +7,8 @@ export const CONSULTANT_STATES = {
   ACTIVE: 'active',
   PENALIZED: 'penalized',
   DISABLED: 'disabled',
+  BLOCKED: 'blocked',
+  INACTIVE: 'inactive',
 };
 
 // IDs de productos especiales
@@ -17,6 +19,10 @@ export const PREMIO_PRODUCT_ID = 6694;
 export const MIN_AMOUNT_NEW = 20000;
 export const MIN_AMOUNT_ACTIVE = 1000;
 export const MIN_AMOUNT_PENALIZED = 20000;
+export const MIN_AMOUNT_INACTIVE = 20000;
+
+// Ventana de inactividad en meses (rolling window desde ultima compra calificada)
+export const INACTIVE_GRACE_MONTHS = 3;
 
 // Umbral trimestral para penalización (en RD$)
 export const QUARTERLY_THRESHOLD = 20000;
