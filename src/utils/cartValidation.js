@@ -7,6 +7,7 @@ import {
   KIT_PRODUCT_ID,
   PREMIO_PRODUCT_ID,
   CONSULTANT_STATES,
+  MIN_AMOUNT_INACTIVE,
 } from '../constants/cartRules';
 import { getConsultantState, getMinimumForState } from '../utils/consultantState';
 import { calcularPrecioFinal } from '../utils/discounts';
@@ -39,6 +40,10 @@ export function isPremioItem(item) {
 export function getMinRequiredForUser(user) {
   if (!user) return null;
   if (user.role === 'administrator' || user.isAdmin) return null;
+  // Restriccion INACTIVE tiene prioridad sobre el estado base
+  if (user.restrictionState === CONSULTANT_STATES.INACTIVE) {
+    return MIN_AMOUNT_INACTIVE;
+  }
   const state = getConsultantState(user);
   return getMinimumForState(state);
 }
@@ -73,6 +78,20 @@ export function calcularTotalSeccion2(cartItems, user) {
 export function validarCarrito(cartItems, user, totalConDescuento, premioTotal = 0) {
   if (!user) return { valid: true };
   if (user.role === 'administrator' || user.isAdmin) return { valid: true };
+
+  // BLOCKED: cuenta bloqueada por admin — maxima prioridad
+  if (user.restrictionState === CONSULTANT_STATES.BLOCKED) {
+    return { valid: false, type: 'blocked', minRequired: null };
+  }
+
+  // INACTIVE: minimo RD$20,000 para reactivar, evaluado antes del estado base
+  if (user.restrictionState === CONSULTANT_STATES.INACTIVE) {
+    const total = (typeof totalConDescuento === 'number' ? totalConDescuento : 0) - (premioTotal || 0);
+    if (total < MIN_AMOUNT_INACTIVE) {
+      return { valid: false, gap: MIN_AMOUNT_INACTIVE - total, type: 'inactive', minRequired: MIN_AMOUNT_INACTIVE };
+    }
+    return { valid: true };
+  }
 
   const state = getConsultantState(user);
   const minimum = getMinimumForState(state);
@@ -130,6 +149,8 @@ export function getValidationMessage(result) {
   const gap = result.gap != null ? Math.ceil(result.gap) : 0;
   const gapStr = gap.toLocaleString('es-DO');
   switch (result.type) {
+    case 'blocked':
+      return 'Tu cuenta esta bloqueada. Contacta a soporte tecnico.';
     case 'disabled':
       return 'Tu cuenta esta deshabilitada. Contacta a soporte para mas informacion.';
     case 'missing_kit':
@@ -140,6 +161,8 @@ export function getValidationMessage(result) {
       return `Pedido minimo RD$ 1,000 en productos con descuento. Faltan RD$ ${gapStr}.`;
     case 'penalized':
       return `Para reactivar tu cuenta, pedido minimo RD$ 20,000. Faltan RD$ ${gapStr}.`;
+    case 'inactive':
+      return `Tu cuenta esta inactiva. Para reactivarla necesitas una compra minima de RD$20,000. Faltan RD$ ${gapStr}.`;
     default:
       return 'Tu carrito no cumple con los requisitos minimos.';
   }

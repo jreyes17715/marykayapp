@@ -20,7 +20,7 @@ import { createOrder, getProductImage, formatPrice, stripHtml, updateCustomer } 
 import { getProductPrice } from '../utils/helpers';
 import OrderSummaryCard from '../components/OrderSummaryCard';
 import { validarCarrito, getValidationMessage } from '../utils/cartValidation';
-import { KIT_PRODUCT_ID, PREMIO_PRODUCT_ID } from '../constants/cartRules';
+import { KIT_PRODUCT_ID, PREMIO_PRODUCT_ID, CONSULTANT_STATES } from '../constants/cartRules';
 import { getTransitionAfterPurchase, buildMetaUpdatesForTransition } from '../utils/consultantState';
 import { cancelReservation } from '../api/flai';
 import { buildPaymentRequest } from '../api/azul';
@@ -239,7 +239,7 @@ export default function CheckoutScreen() {
         { key: '_free_shipping_until', value: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString() },
       ];
 
-      const newState = getTransitionAfterPurchase(
+      let newState = getTransitionAfterPurchase(
         user.consultantState,
         orderTotal,
         user.hasBoughtKit,
@@ -253,6 +253,21 @@ export default function CheckoutScreen() {
         metaUpdates.push(...transitionMeta);
       } else if (!user.hasBoughtKit && kitInCart) {
         metaUpdates.push({ key: 'has_bought_kit', value: 'yes' });
+      }
+
+      // Si la consultora estaba INACTIVE y la compra califica, reactivar
+      if (!newState && user.restrictionState === CONSULTANT_STATES.INACTIVE) {
+        const inactiveTransition = getTransitionAfterPurchase(
+          CONSULTANT_STATES.INACTIVE,
+          orderTotal,
+          user.hasBoughtKit,
+          kitInCart
+        );
+        if (inactiveTransition) {
+          newState = inactiveTransition;
+          const inactiveMeta = buildMetaUpdatesForTransition(newState, { fromInactive: true });
+          metaUpdates.push(...inactiveMeta);
+        }
       }
 
       if (premioInCart && user.rewardAvailable) {
