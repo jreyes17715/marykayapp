@@ -8,15 +8,15 @@ import {
   getOrdersByCustomer,
   updateCustomer,
 } from '../api/woocommerce';
-import { getUserMeta } from '../utils/helpers';
 import { CONSULTANT_STATES } from '../constants/cartRules';
 import {
+  getUserMeta,
   getConsultantState,
-  getPreviousQuarterBounds,
   getQuarterBounds,
   computeQuarterlyTotal,
-  shouldPenalize,
   isRewardEligible,
+  resolveRestrictionState,
+  shouldMarkInactive,
 } from '../utils/consultantState';
 
 const TOKEN_STORAGE_KEY = '@marykay_jwt_token';
@@ -59,6 +59,8 @@ async function buildUserFromToken(token, initialEmail) {
     const blockedAt = getUserMeta(metaData, 'blocked_at') || null;
     const rewardAvailable = parseBool(getUserMeta(metaData, 'reward_available'));
     const rewardRedeemed = parseBool(getUserMeta(metaData, 'reward_redeemed'));
+    const isDeactivated = getUserMeta(metaData, 'ud_is_deactivated') === '1';
+    const lastActivePurchaseTs = getUserMeta(metaData, '_kit_last_active_purchase_ts') || null;
 
     const resolvedConsultantState =
       consultantStateRaw ||
@@ -94,7 +96,13 @@ async function buildUserFromToken(token, initialEmail) {
       rewardAvailable,
       rewardRedeemed,
       isDisabled: resolvedConsultantState === CONSULTANT_STATES.DISABLED,
+      isDeactivated,
+      lastActivePurchaseTs,
+      isBlocked: false,
+      restrictionState: null,
     };
+    user.restrictionState = resolveRestrictionState(user);
+    user.isBlocked = user.restrictionState === CONSULTANT_STATES.BLOCKED;
     return { success: true, user };
   }
 
@@ -128,6 +136,10 @@ async function buildUserFromToken(token, initialEmail) {
     rewardAvailable: false,
     rewardRedeemed: false,
     isDisabled: false,
+    isDeactivated: false,
+    lastActivePurchaseTs: null,
+    isBlocked: false,
+    restrictionState: null,
   };
   return { success: true, user };
 }
@@ -168,16 +180,16 @@ export function AuthProvider({ children }) {
       if (!ordersResult.success || !ordersResult.data) return;
 
       const orders = ordersResult.data;
-      const { start, end } = getPreviousQuarterBounds();
-      const quarterlyTotal = computeQuarterlyTotal(orders, start, end);
-
       const metaUpdates = [];
       let newState = currentUser.consultantState;
 
-      // Evaluar penalizacion trimestral
-      if (currentUser.consultantState === CONSULTANT_STATES.ACTIVE && shouldPenalize(quarterlyTotal)) {
-        newState = CONSULTANT_STATES.PENALIZED;
-        metaUpdates.push({ key: 'consultant_state', value: CONSULTANT_STATES.PENALIZED });
+      // Evaluar inactividad rolling (reemplaza penalizacion trimestral fija)
+      if (currentUser.consultantState === CONSULTANT_STATES.ACTIVE) {
+        const lastTs = getUserMeta(currentUser.meta_data, '_kit_last_active_purchase_ts');
+        if (shouldMarkInactive(lastTs)) {
+          newState = CONSULTANT_STATES.INACTIVE;
+          metaUpdates.push({ key: 'consultant_state', value: CONSULTANT_STATES.INACTIVE });
+        }
       }
 
       // Evaluar elegibilidad de reward (usa trimestre actual)
@@ -199,6 +211,7 @@ export function AuthProvider({ children }) {
             ...prev,
             consultantState: newState,
             rewardAvailable: metaUpdates.some((m) => m.key === 'reward_available') ? true : prev.rewardAvailable,
+            restrictionState: newState === CONSULTANT_STATES.INACTIVE ? CONSULTANT_STATES.INACTIVE : prev.restrictionState,
           };
         });
       }
@@ -229,8 +242,9 @@ export function AuthProvider({ children }) {
     await persistToken(token);
     setUser(buildResult.user);
 
-    // Evaluar estado trimestral en background para usuarios ACTIVE
-    if (buildResult.user.consultantState === CONSULTANT_STATES.ACTIVE) {
+    // Evaluar estado trimestral en background para usuarios ACTIVE e INACTIVE
+    if (buildResult.user.consultantState === CONSULTANT_STATES.ACTIVE ||
+        buildResult.user.consultantState === CONSULTANT_STATES.INACTIVE) {
       evaluateQuarterlyStatus(buildResult.user).catch(() => {});
     }
 
@@ -274,8 +288,9 @@ export function AuthProvider({ children }) {
             if (cancelled) return;
             if (buildResult.success && !buildResult.user.isDisabled) {
               setUser(buildResult.user);
-              // Evaluar trimestral en background
-              if (buildResult.user.consultantState === CONSULTANT_STATES.ACTIVE) {
+              // Evaluar trimestral en background para usuarios ACTIVE e INACTIVE
+              if (buildResult.user.consultantState === CONSULTANT_STATES.ACTIVE ||
+                  buildResult.user.consultantState === CONSULTANT_STATES.INACTIVE) {
                 evaluateQuarterlyStatus(buildResult.user).catch(() => {});
               }
             } else {
