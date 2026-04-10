@@ -59,7 +59,6 @@ async function buildUserFromToken(token, initialEmail) {
     const blockedAt = getUserMeta(metaData, 'blocked_at') || null;
     const rewardAvailable = parseBool(getUserMeta(metaData, 'reward_available'));
     const rewardRedeemed = parseBool(getUserMeta(metaData, 'reward_redeemed'));
-    const isDeactivated = getUserMeta(metaData, 'ud_is_deactivated') === '1';
     const lastActivePurchaseTs = getUserMeta(metaData, '_kit_last_active_purchase_ts') || null;
 
     const resolvedConsultantState =
@@ -96,7 +95,6 @@ async function buildUserFromToken(token, initialEmail) {
       rewardAvailable,
       rewardRedeemed,
       isDisabled: resolvedConsultantState === CONSULTANT_STATES.DISABLED,
-      isDeactivated,
       lastActivePurchaseTs,
       isBlocked: false,
       restrictionState: null,
@@ -136,7 +134,6 @@ async function buildUserFromToken(token, initialEmail) {
     rewardAvailable: false,
     rewardRedeemed: false,
     isDisabled: false,
-    isDeactivated: false,
     lastActivePurchaseTs: null,
     isBlocked: false,
     restrictionState: null,

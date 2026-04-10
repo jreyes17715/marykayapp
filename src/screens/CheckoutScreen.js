@@ -239,8 +239,12 @@ export default function CheckoutScreen() {
         { key: '_free_shipping_until', value: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString() },
       ];
 
+      const fromInactive = user.restrictionState === CONSULTANT_STATES.INACTIVE;
+      // Si la consultora esta INACTIVE, forzar estado INACTIVE para la transicion
+      const stateForTransition = fromInactive ? CONSULTANT_STATES.INACTIVE : user.consultantState;
+
       let newState = getTransitionAfterPurchase(
-        user.consultantState,
+        stateForTransition,
         orderTotal,
         user.hasBoughtKit,
         kitInCart
@@ -249,25 +253,11 @@ export default function CheckoutScreen() {
       if (newState) {
         const transitionMeta = buildMetaUpdatesForTransition(newState, {
           hasBoughtKit: !user.hasBoughtKit && kitInCart,
+          fromInactive,
         });
         metaUpdates.push(...transitionMeta);
       } else if (!user.hasBoughtKit && kitInCart) {
         metaUpdates.push({ key: 'has_bought_kit', value: 'yes' });
-      }
-
-      // Si la consultora estaba INACTIVE y la compra califica, reactivar
-      if (!newState && user.restrictionState === CONSULTANT_STATES.INACTIVE) {
-        const inactiveTransition = getTransitionAfterPurchase(
-          CONSULTANT_STATES.INACTIVE,
-          orderTotal,
-          user.hasBoughtKit,
-          kitInCart
-        );
-        if (inactiveTransition) {
-          newState = inactiveTransition;
-          const inactiveMeta = buildMetaUpdatesForTransition(newState, { fromInactive: true });
-          metaUpdates.push(...inactiveMeta);
-        }
       }
 
       if (premioInCart && user.rewardAvailable) {
