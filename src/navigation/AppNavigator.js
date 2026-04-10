@@ -15,6 +15,7 @@ import CheckoutScreen from '../screens/CheckoutScreen';
 import LoginScreen from '../screens/LoginScreen';
 import ConsultantListScreen from '../screens/ConsultantListScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import BlockedScreen from '../screens/BlockedScreen';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { CartContext } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -270,10 +271,14 @@ function AuthNavigator() {
 }
 
 export default function AppNavigator() {
-  const { isLoggedIn, isLoading } = useAuth();
+  const { isLoggedIn, isLoading, user } = useAuth();
 
   if (isLoading) {
     return <LoadingSpinner message="Cargando..." />;
+  }
+
+  if (isLoggedIn && user?.restrictionState === 'blocked') {
+    return <BlockedScreen />;
   }
 
   return (
