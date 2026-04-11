@@ -100,14 +100,14 @@ function HomeStack() {
               style={{ marginRight: 16 }}
               activeOpacity={0.8}
             >
-              <View>
+              <View style={{ padding: 4 }}>
                 <Feather name="bell" size={22} color={colors.secondary} />
                 {unreadCount > 0 && (
                   <View
                     style={{
                       position: 'absolute',
-                      top: -5,
-                      right: -8,
+                      top: -2,
+                      right: -4,
                       backgroundColor: colors.primary,
                       borderRadius: 10,
                       width: 18,
