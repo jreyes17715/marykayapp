@@ -100,6 +100,7 @@ export default function CheckoutScreen() {
     shipping,
     setShippingProvince,
     clearCart,
+    isRestored,
   } = useCart();
   const reserveId = route.params?.reserveId ?? null;
 
@@ -146,18 +147,22 @@ export default function CheckoutScreen() {
     }
   }, [setShippingProvince]);
 
+  // Bug3+Bug4: Don't auto-goBack (destroys billing form state). Show alert with option to go back.
+  // Bug4: Guard with isRestored so validation doesn't run before cart is fully hydrated.
   useFocusEffect(
     useCallback(() => {
+      if (!isRestored) return;
       const total = totalConDescuento ?? totalPrice ?? 0;
       const validation = validarCarrito(cartItems, user, total);
       if (!validation.valid) {
         const msg = getValidationMessage(validation);
-        navigation.goBack();
-        setTimeout(() => {
-          Alert.alert('Carrito no válido', msg || 'Tu carrito no cumple los requisitos mínimos. Revisa el carrito.');
-        }, 400);
+        Alert.alert(
+          'Carrito no válido',
+          msg || 'Tu carrito no cumple los requisitos mínimos. Revisa el carrito.',
+          [{ text: 'Volver al carrito', onPress: () => navigation.goBack() }]
+        );
       }
-    }, [cartItems, user, totalConDescuento, totalPrice, navigation])
+    }, [cartItems, user, totalConDescuento, totalPrice, navigation, isRestored])
   );
 
   const totalDiscount = Math.max(
@@ -226,9 +231,10 @@ export default function CheckoutScreen() {
 
   // Post-order actions shared by both payment flows
   const handleOrderSuccess = useCallback((orderData) => {
-    clearCart();
+    // Bug1: set success BEFORE clearing cart so cart isn't wiped on intermediate error
     setOrderId(orderData.id != null ? orderData.id : '');
     setSuccess(true);
+    clearCart();
 
     if (user?.customerId) {
       const orderTotal = totalConDescuento ?? totalPrice ?? 0;
@@ -240,7 +246,6 @@ export default function CheckoutScreen() {
       ];
 
       const fromInactive = user.restrictionState === CONSULTANT_STATES.INACTIVE;
-      // Si la consultora esta INACTIVE, forzar estado INACTIVE para la transicion
       const stateForTransition = fromInactive ? CONSULTANT_STATES.INACTIVE : user.consultantState;
 
       let newState = getTransitionAfterPurchase(
@@ -267,10 +272,13 @@ export default function CheckoutScreen() {
         );
       }
 
-      updateCustomer(user.customerId, { meta_data: metaUpdates }).catch(() => {});
+      // Bug10: sequence updateCustomer before refreshUserData to avoid reading stale meta
+      updateCustomer(user.customerId, { meta_data: metaUpdates })
+        .catch(() => {})
+        .finally(() => refreshUserData?.());
+    } else {
+      refreshUserData?.();
     }
-
-    refreshUserData?.();
   }, [clearCart, user, totalConDescuento, totalPrice, cartItems, refreshUserData]);
 
   // Create WooCommerce order (used by both flows)
@@ -290,9 +298,13 @@ export default function CheckoutScreen() {
     if (res.success && res.data) {
       handleOrderSuccess(res.data);
     } else {
+      // Bug5: timeout may mean order was created server-side — warn user to check orders
+      const isTimeout = (res.error || '').includes('Tiempo de espera');
       Alert.alert(
         'Error al crear el pedido',
-        res.error || 'No se pudo crear la orden. Intenta de nuevo.'
+        isTimeout
+          ? 'La conexion tardo demasiado. Verifica en "Mis Pedidos" antes de intentar de nuevo para evitar duplicados.'
+          : (res.error || 'No se pudo crear la orden. Intenta de nuevo.')
       );
     }
     return res;
