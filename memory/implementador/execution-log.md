@@ -2,6 +2,25 @@
 > Escribir una entrada después de CADA implementación.
 > Este log se consolida semanalmente para extraer patrones nuevos.
 
+## 2026-04-11 — Bugfix batch: 10 critical bugs (7 commits)
+- Tarea: Auditar y corregir 10 bugs criticos: persistencia carrito, kit auto-add, billing perdido, falso error carrito, timeout orden, kit flag, badge notificaciones, BlockedScreen UX, validacion INACTIVE, kit state flip
+- Resultado: aprobado (reviewer: approve with changes, H1+H2+M4 corregidos)
+- Tiempo: ~45 minutos
+- Aprendizaje:
+  - clearCart siempre debe ir DESPUES de setSuccess para evitar wipe en error intermedio
+  - Pre-cargar refs de producto (kit) al montar evita race conditions en addToCart
+  - useFocusEffect con navigation.goBack() destruye form state — usar Alert con boton
+  - updateCustomer fire-and-forget + refreshUserData inmediato = race condition clasica — usar .finally()
+  - shouldMarkInactive debe aplicarse sincrónicamente en buildUserFromToken, no solo en background
+  - evaluateQuarterlyStatus debe re-correr resolveRestrictionState para no pisar BLOCKED
+  - Linking.openURL('mailto:') necesita .catch() fallback en dispositivos sin email client
+
+## 2026-04-11 — CartContext: fix race condition en kit auto-inject
+- Tarea: Agregar useEffect de pre-carga del kit product al montar CartProvider, para que kitProductRef.current siempre este poblado cuando addToCart se ejecute por primera vez, evitando la rama async que causa falsos errores de carrito invalido en CheckoutScreen.
+- Resultado: aprobado
+- Tiempo: ~2 minutos
+- Aprendizaje: El useEffect vacio ([]) se coloca justo despues del restore effect (linea 165) y antes del persist effect (linea 176). No necesita depender de user porque KIT_PRODUCT_ID es constante y getProductById no requiere autenticacion. Bug 1 (clearCart post-checkout) pertenece a CheckoutScreen T003 — no se toco CartContext para ese caso.
+
 ## 2026-04-10 — AuthContext: soporte BLOCKED + INACTIVE en restriction states
 - Tarea: Agregar resolveRestrictionState/shouldMarkInactive/getUserMeta desde consultantState.js; nuevos campos isDeactivated, lastActivePurchaseTs, isBlocked, restrictionState en buildUserFromToken; reemplazar penalizacion trimestral con inactivity rolling check; extender evaluateQuarterlyStatus a INACTIVE; NO rechazar BLOCKED en login
 - Resultado: aprobado
@@ -75,6 +94,12 @@
 - Resultado: aprobado
 - Tiempo: ~10 minutos
 - Aprendizaje: El campo restrictionState ('blocked'|'inactive'|null) es independiente de consultantState. Siempre se evalua ANTES del estado base en validarCarrito. La reactivacion INACTIVE en checkout es un segundo intento de transicion: si el primer getTransitionAfterPurchase(user.consultantState,...) retorna null (porque consultantState puede ser 'active' para usuarios con restriction), se intenta explicitamente con CONSULTANT_STATES.INACTIVE como estado. buildMetaUpdatesForTransition con fromInactive:true escribe _kit_last_active_purchase_ts reiniciando el rolling window.
+
+## 2026-04-11 — BlockedScreen: reemplazar WhatsApp por email de soporte
+- Tarea: Cambiar handleContactarSoporte de wa.me a mailto:atencionalcliente@aromadelrosal.com; actualizar texto del mensaje para mostrar el email visible; actualizar texto del boton a "Enviar Correo a Soporte".
+- Resultado: aprobado
+- Tiempo: ~2 minutos
+- Aprendizaje: Bug 8B — enlace WhatsApp hardcodeado no era el canal de soporte correcto. mailto: es el canal oficial.
 
 ## 2026-04-06 — AZUL Payment Page integration (pago con tarjeta)
 - Tarea: Integrar AZUL Payment Page como metodo de pago alternativo a transferencia bancaria. Crear src/api/azul.js (hash SHA512, UTF-16LE, build params, validate response), src/components/AzulPaymentWebView.js (WebView embebido con form POST auto-submit, intercepta callbacks), actualizar CheckoutScreen con selector de metodo de pago y flujo AZUL via Modal.
