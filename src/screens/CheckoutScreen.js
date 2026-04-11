@@ -149,9 +149,10 @@ export default function CheckoutScreen() {
 
   // Bug3+Bug4: Don't auto-goBack (destroys billing form state). Show alert with option to go back.
   // Bug4: Guard with isRestored so validation doesn't run before cart is fully hydrated.
+  // H2: Skip validation on success screen to avoid spurious alerts after checkout.
   useFocusEffect(
     useCallback(() => {
-      if (!isRestored) return;
+      if (!isRestored || success) return;
       const total = totalConDescuento ?? totalPrice ?? 0;
       const validation = validarCarrito(cartItems, user, total);
       if (!validation.valid) {
@@ -162,7 +163,7 @@ export default function CheckoutScreen() {
           [{ text: 'Volver al carrito', onPress: () => navigation.goBack() }]
         );
       }
-    }, [cartItems, user, totalConDescuento, totalPrice, navigation, isRestored])
+    }, [cartItems, user, totalConDescuento, totalPrice, navigation, isRestored, success])
   );
 
   const totalDiscount = Math.max(

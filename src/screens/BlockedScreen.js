@@ -6,6 +6,7 @@ import {
   StyleSheet,
   SafeAreaView,
   Linking,
+  Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -14,7 +15,9 @@ export default function BlockedScreen() {
   const { logout } = useAuth();
 
   function handleContactarSoporte() {
-    Linking.openURL('mailto:atencionalcliente@aromadelrosal.com');
+    Linking.openURL('mailto:atencionalcliente@aromadelrosal.com').catch(() => {
+      Alert.alert('Correo de soporte', 'atencionalcliente@aromadelrosal.com');
+    });
   }
 
   return (

@@ -213,15 +213,17 @@ export function AuthProvider({ children }) {
       if (metaUpdates.length > 0) {
         await updateCustomer(currentUser.customerId, { meta_data: metaUpdates });
 
-        // Actualizar estado local
+        // Actualizar estado local — re-run resolveRestrictionState to preserve BLOCKED priority
         setUser((prev) => {
           if (!prev) return prev;
-          return {
+          const updated = {
             ...prev,
             consultantState: newState,
             rewardAvailable: metaUpdates.some((m) => m.key === 'reward_available') ? true : prev.rewardAvailable,
-            restrictionState: newState === CONSULTANT_STATES.INACTIVE ? CONSULTANT_STATES.INACTIVE : prev.restrictionState,
           };
+          updated.restrictionState = resolveRestrictionState(updated);
+          updated.isBlocked = updated.restrictionState === CONSULTANT_STATES.BLOCKED;
+          return updated;
         });
       }
     } catch (e) {
