@@ -14,7 +14,7 @@ export default function BlockedScreen() {
   const { logout } = useAuth();
 
   function handleContactarSoporte() {
-    Linking.openURL('https://wa.me/18095551234');
+    Linking.openURL('mailto:atencionalcliente@aromadelrosal.com');
   }
 
   return (
@@ -25,8 +25,7 @@ export default function BlockedScreen() {
         <Text style={styles.title}>Cuenta Bloqueada</Text>
 
         <Text style={styles.message}>
-          Tu cuenta ha sido bloqueada. Debes contactar a soporte tecnico para
-          poder continuar usando la aplicacion.
+          Tu cuenta ha sido desactivada. Para mas informacion, contacta a soporte tecnico:{'\n\n'}atencionalcliente@aromadelrosal.com
         </Text>
 
         <TouchableOpacity
@@ -34,7 +33,7 @@ export default function BlockedScreen() {
           onPress={handleContactarSoporte}
           activeOpacity={0.8}
         >
-          <Text style={styles.buttonPrimaryText}>Contactar Soporte</Text>
+          <Text style={styles.buttonPrimaryText}>Enviar Correo a Soporte</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
