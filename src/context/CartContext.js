@@ -164,6 +164,15 @@ export function CartProvider({ children }) {
       .catch(() => setIsRestored(true));
   }, []);
 
+  // Pre-load kit product at mount so addToCart can always use the sync path
+  useEffect(() => {
+    getProductById(KIT_PRODUCT_ID).then((res) => {
+      if (res.success && res.data) {
+        kitProductRef.current = res.data;
+      }
+    });
+  }, []);
+
   useEffect(() => {
     if (!isRestored) return;
     persistCart(cartItems);
