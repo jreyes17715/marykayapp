@@ -65,14 +65,24 @@ async function buildUserFromToken(token, initialEmail) {
       consultantStateRaw ||
       getConsultantState({ hasBoughtKit: parseBool(getUserMeta(metaData, 'has_bought_kit')) });
 
+    // Bug9: pre-apply inactivity check synchronously so resolveRestrictionState works correctly
+    const effectiveConsultantState =
+      (resolvedConsultantState === CONSULTANT_STATES.ACTIVE && shouldMarkInactive(lastActivePurchaseTs))
+        ? CONSULTANT_STATES.INACTIVE
+        : resolvedConsultantState;
+
     const user = {
       id: wpUser.id,
       customerId: customer.id,
       email: customer.email || email,
-      displayName:
-        customer.first_name && customer.last_name
+      displayName: (() => {
+        const raw = (customer.first_name && customer.last_name)
           ? `${customer.first_name} ${customer.last_name}`.trim()
-          : (wpUser.name || wpUser.user_display_name || customer.username || email),
+          : (wpUser.name || wpUser.user_display_name || customer.username || email);
+        return (typeof raw === 'string' && raw.startsWith('@ud_'))
+          ? (customer.first_name || customer.last_name || email || 'Consultora')
+          : raw;
+      })(),
       firstName: customer.first_name || '',
       lastName: customer.last_name || '',
       token,
@@ -90,11 +100,11 @@ async function buildUserFromToken(token, initialEmail) {
       salesCurrentMonth: 0,
       freeShippingUntil,
       hasFreeShipping: freeShippingUntil != null && new Date(freeShippingUntil) > new Date(),
-      consultantState: resolvedConsultantState,
+      consultantState: effectiveConsultantState,
       blockedAt,
       rewardAvailable,
       rewardRedeemed,
-      isDisabled: resolvedConsultantState === CONSULTANT_STATES.DISABLED,
+      isDisabled: effectiveConsultantState === CONSULTANT_STATES.DISABLED,
       lastActivePurchaseTs,
       isBlocked: false,
       restrictionState: null,
@@ -105,8 +115,10 @@ async function buildUserFromToken(token, initialEmail) {
   }
 
   // Sin customer en WooCommerce: entrar con datos básicos del JWT/WP
-  const displayName =
-    wpUser.name || wpUser.user_display_name || wpUser.nicename || email || 'Usuario';
+  const rawDisplayName = wpUser.name || wpUser.user_display_name || wpUser.nicename || email || 'Usuario';
+  const displayName = (typeof rawDisplayName === 'string' && rawDisplayName.startsWith('@ud_'))
+    ? (email || 'Usuario')
+    : rawDisplayName;
   const user = {
     id: wpUser.id,
     customerId: 0,

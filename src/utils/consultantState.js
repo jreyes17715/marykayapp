@@ -154,6 +154,10 @@ export function deriveStateFromLegacy(user) {
  */
 export function getConsultantState(user) {
   if (user.consultantState && VALID_STATES.has(user.consultantState)) {
+    // Heal inconsistency: 'new' + hasBoughtKit = 'active'
+    if (user.consultantState === CONSULTANT_STATES.NEW && user.hasBoughtKit === true) {
+      return CONSULTANT_STATES.ACTIVE;
+    }
     return user.consultantState;
   }
   return deriveStateFromLegacy(user);
