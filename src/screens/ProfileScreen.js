@@ -91,6 +91,7 @@ export default function ProfileScreen() {
   const nivelInfo = useMemo(() => calcularDescuentoUsuario(user), [user]);
   const consultantState = user?.consultantState || CONSULTANT_STATES.NEW;
   const isPenalized = consultantState === CONSULTANT_STATES.PENALIZED;
+  const isInactive = consultantState === CONSULTANT_STATES.INACTIVE;
 
   const vigenciaFormatted = user?.vigencia50 ? formatVigencia(user.vigencia50) : null;
   const vigenciaDiasRest = user?.vigencia50 ? diasRestantes(user.vigencia50) : null;
@@ -169,7 +170,7 @@ export default function ProfileScreen() {
           {
             borderLeftColor: consultantState === CONSULTANT_STATES.NEW
               ? KIT_PENDIENTE
-              : isPenalized
+              : (isPenalized || isInactive)
                 ? REACTIVACION
                 : KIT_COMPRADO,
           },
@@ -195,6 +196,13 @@ export default function ProfileScreen() {
             <Text style={styles.estadoLine}>✅ Kit Inicial: Comprado</Text>
             <Text style={[styles.estadoLine, { color: REACTIVACION }]}>
               ⚠️ Cuenta penalizada: pedido minimo RD$ 20,000
+            </Text>
+          </>
+        ) : consultantState === CONSULTANT_STATES.INACTIVE ? (
+          <>
+            <Text style={styles.estadoLine}>✅ Kit Inicial: Comprado</Text>
+            <Text style={[styles.estadoLine, { color: REACTIVACION }]}>
+              ⚠️ Cuenta inactiva: pedido minimo RD$ 20,000 para reactivar
             </Text>
           </>
         ) : consultantState === CONSULTANT_STATES.ACTIVE ? (
