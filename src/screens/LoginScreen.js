@@ -53,10 +53,17 @@ export default function LoginScreen() {
       await login(user, password);
       // Al cambiar isLoggedIn, AppNavigator muestra MainTabs automáticamente
     } catch (e) {
-      if (e?.message === 'ACCOUNT_DISABLED') {
+      const errMsg = e?.message || '';
+      if (errMsg === 'ACCOUNT_DISABLED') {
         Alert.alert(
           'Cuenta Deshabilitada',
           'Tu cuenta ha sido deshabilitada. Por favor contacta a soporte para mas informacion.',
+          [{ text: 'Entendido' }]
+        );
+      } else if (errMsg.includes('is_deactiv')) {
+        Alert.alert(
+          'Cuenta Bloqueada',
+          'Tu usuario fue inhabilitado. Para mas informacion debes contactar a soporte en soporte@aromadelrosal.com',
           [{ text: 'Entendido' }]
         );
       } else {
