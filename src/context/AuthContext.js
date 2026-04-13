@@ -66,10 +66,10 @@ async function buildUserFromToken(token, initialEmail) {
       getConsultantState({ hasBoughtKit: parseBool(getUserMeta(metaData, 'has_bought_kit')) });
 
     // _kit_activa_confirmada es la fuente de verdad del backend para inactividad.
-    // Si la flag existe y es falsy, el usuario esta INACTIVE.
-    // Si es null (no existe), se confia en consultant_state (backward compat).
+    // Para usuarios ACTIVE: solo '1' o 'yes' confirman actividad.
+    // Cualquier otro valor (null, '0', '', 'no', 'false') = INACTIVE.
     const effectiveConsultantState =
-      (resolvedConsultantState === CONSULTANT_STATES.ACTIVE && kitActivaConfirmada !== null && kitActivaConfirmada !== '1' && kitActivaConfirmada !== 'yes')
+      (resolvedConsultantState === CONSULTANT_STATES.ACTIVE && kitActivaConfirmada !== '1' && kitActivaConfirmada !== 'yes')
         ? CONSULTANT_STATES.INACTIVE
         : resolvedConsultantState;
 

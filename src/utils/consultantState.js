@@ -100,11 +100,11 @@ export function resolveRestrictionState(user) {
     return CONSULTANT_STATES.INACTIVE;
   }
 
-  // For ACTIVE users: _kit_activa_confirmada es la fuente de verdad del backend
+  // For ACTIVE users: _kit_activa_confirmada es la fuente de verdad del backend.
+  // Solo '1' o 'yes' confirman actividad. Todo lo demas (null, '0', '') = INACTIVE.
   if (state === CONSULTANT_STATES.ACTIVE) {
     const flag = getUserMeta(user.meta_data, '_kit_activa_confirmada');
-    // Flag existe y es falsy → INACTIVE. Null/missing → confiar en consultant_state.
-    if (flag !== null && flag !== '1' && flag !== 'yes') {
+    if (flag !== '1' && flag !== 'yes') {
       return CONSULTANT_STATES.INACTIVE;
     }
   }
