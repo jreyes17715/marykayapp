@@ -94,7 +94,14 @@ export function resolveRestrictionState(user) {
   }
 
   const state = getConsultantState(user);
-  if (state === CONSULTANT_STATES.ACTIVE || state === CONSULTANT_STATES.INACTIVE) {
+
+  // If already marked INACTIVE (by server meta or pre-application), trust it
+  if (state === CONSULTANT_STATES.INACTIVE) {
+    return CONSULTANT_STATES.INACTIVE;
+  }
+
+  // For ACTIVE users, check if they should become INACTIVE
+  if (state === CONSULTANT_STATES.ACTIVE) {
     if (isInactive(user)) {
       return CONSULTANT_STATES.INACTIVE;
     }
