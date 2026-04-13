@@ -27,7 +27,7 @@ import {
   getInsufficientStock,
 } from '../api/flai';
 import { calcularPrecioFinal } from '../utils/discounts';
-import { validarCarrito, getValidationMessage, getMinRequiredForUser } from '../utils/cartValidation';
+import { validarCarrito, getValidationMessage, getMinRequiredForUser, calcularTotalSeccion2 } from '../utils/cartValidation';
 import { KIT_PRODUCT_ID, PREMIO_PRODUCT_ID } from '../constants/cartRules';
 import QuantitySelector from '../components/QuantitySelector';
 import FreeShippingBanner from '../components/FreeShippingBanner';
@@ -78,10 +78,6 @@ export default function CartScreen() {
   const [bottomHeight, setBottomHeight] = useState(320);
   const timeoutRef = useRef(null);
 
-  const premioTotal = useMemo(
-    () => cartItems.reduce((sum, item) => item.product.id === PREMIO_PRODUCT_ID ? sum : 0, 0),
-    [cartItems]
-  );
   const validation = useMemo(
     () => validarCarrito(cartItems, user, totalConDescuento, totalConDescuento - totalSinPremio),
     [cartItems, user, totalConDescuento, totalSinPremio]
@@ -90,10 +86,15 @@ export default function CartScreen() {
   const validationMessage = getValidationMessage(validation);
   const minRequired = validation.minRequired ?? getMinRequiredForUser(user);
   const showProgress = user && minRequired != null && minRequired > 0 && cartItems.length > 0;
+  // INACTIVE y ACTIVE usan solo productos con descuento (seccion 2) para el minimo
+  const totalParaProgreso = useMemo(() => {
+    if (user?.restrictionState === 'inactive') return calcularTotalSeccion2(cartItems, user);
+    return totalConDescuento;
+  }, [user, cartItems, totalConDescuento]);
   const progressPct = showProgress
-    ? Math.min(100, (totalConDescuento / minRequired) * 100)
+    ? Math.min(100, (totalParaProgreso / minRequired) * 100)
     : 100;
-  const progressReached = showProgress && totalConDescuento >= minRequired;
+  const progressReached = showProgress && totalParaProgreso >= minRequired;
 
   const handleClearCart = useCallback(() => {
     if (cartItems.length === 0) return;

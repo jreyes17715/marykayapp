@@ -84,11 +84,11 @@ export function validarCarrito(cartItems, user, totalConDescuento, premioTotal =
     return { valid: false, type: 'blocked', minRequired: null };
   }
 
-  // INACTIVE: minimo RD$20,000 para reactivar, evaluado antes del estado base
+  // INACTIVE: minimo RD$20,000 solo en productos con descuento (seccion 2) para reactivar
   if (user.restrictionState === CONSULTANT_STATES.INACTIVE) {
-    const total = (typeof totalConDescuento === 'number' ? totalConDescuento : 0) - (premioTotal || 0);
-    if (total < MIN_AMOUNT_INACTIVE) {
-      return { valid: false, gap: MIN_AMOUNT_INACTIVE - total, type: 'inactive', minRequired: MIN_AMOUNT_INACTIVE };
+    const totalS2 = calcularTotalSeccion2(cartItems, user);
+    if (totalS2 < MIN_AMOUNT_INACTIVE) {
+      return { valid: false, gap: MIN_AMOUNT_INACTIVE - totalS2, type: 'inactive', minRequired: MIN_AMOUNT_INACTIVE };
     }
     return { valid: true };
   }
