@@ -270,12 +270,25 @@ export function AuthProvider({ children }) {
   const refreshUserData = useCallback(async () => {
     if (!user?.token) return;
     try {
-      await loadUserFromToken(user.token);
+      const result = await buildUserFromToken(user.token);
+      if (!result.success) throw new Error(result.error);
+      setUser(prev => {
+        const fresh = result.user;
+        // hasBoughtKit is monotonic: once true, never revert to false
+        if (prev?.hasBoughtKit && !fresh.hasBoughtKit) {
+          fresh.hasBoughtKit = true;
+          if (fresh.consultantState === CONSULTANT_STATES.NEW) {
+            fresh.consultantState = CONSULTANT_STATES.ACTIVE;
+          }
+          fresh.restrictionState = resolveRestrictionState(fresh);
+          fresh.isBlocked = fresh.restrictionState === CONSULTANT_STATES.BLOCKED;
+        }
+        return fresh;
+      });
     } catch (e) {
-      // Token inválido o error de red
       logout();
     }
-  }, [user?.token, loadUserFromToken, logout]);
+  }, [user?.token, logout]);
 
   const isTokenValid = useCallback(async () => {
     if (!user?.token) return false;
