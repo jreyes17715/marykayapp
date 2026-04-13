@@ -16,7 +16,6 @@ import {
   computeQuarterlyTotal,
   isRewardEligible,
   resolveRestrictionState,
-  shouldMarkInactive,
 } from '../utils/consultantState';
 
 const TOKEN_STORAGE_KEY = '@marykay_jwt_token';
@@ -60,14 +59,17 @@ async function buildUserFromToken(token, initialEmail) {
     const rewardAvailable = parseBool(getUserMeta(metaData, 'reward_available'));
     const rewardRedeemed = parseBool(getUserMeta(metaData, 'reward_redeemed'));
     const lastActivePurchaseTs = getUserMeta(metaData, '_kit_last_active_purchase_ts') || null;
+    const kitActivaConfirmada = getUserMeta(metaData, '_kit_activa_confirmada');
 
     const resolvedConsultantState =
       consultantStateRaw ||
       getConsultantState({ hasBoughtKit: parseBool(getUserMeta(metaData, 'has_bought_kit')) });
 
-    // Bug9: pre-apply inactivity check synchronously so resolveRestrictionState works correctly
+    // _kit_activa_confirmada es la fuente de verdad del backend para inactividad.
+    // Si la flag existe y es falsy, el usuario esta INACTIVE.
+    // Si es null (no existe), se confia en consultant_state (backward compat).
     const effectiveConsultantState =
-      (resolvedConsultantState === CONSULTANT_STATES.ACTIVE && shouldMarkInactive(lastActivePurchaseTs))
+      (resolvedConsultantState === CONSULTANT_STATES.ACTIVE && kitActivaConfirmada !== null && kitActivaConfirmada !== '1' && kitActivaConfirmada !== 'yes')
         ? CONSULTANT_STATES.INACTIVE
         : resolvedConsultantState;
 
@@ -192,14 +194,7 @@ export function AuthProvider({ children }) {
       const metaUpdates = [];
       let newState = currentUser.consultantState;
 
-      // Evaluar inactividad rolling (reemplaza penalizacion trimestral fija)
-      if (currentUser.consultantState === CONSULTANT_STATES.ACTIVE) {
-        const lastTs = getUserMeta(currentUser.meta_data, '_kit_last_active_purchase_ts');
-        if (shouldMarkInactive(lastTs)) {
-          newState = CONSULTANT_STATES.INACTIVE;
-          metaUpdates.push({ key: 'consultant_state', value: CONSULTANT_STATES.INACTIVE });
-        }
-      }
+      // Inactividad se maneja por backend via _kit_activa_confirmada — no recalcular en frontend
 
       // Evaluar elegibilidad de reward (usa trimestre actual)
       const currentQuarter = getQuarterBounds();
