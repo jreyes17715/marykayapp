@@ -16,7 +16,7 @@ import {
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import { createOrder, getProductImage, formatPrice, stripHtml, updateCustomer } from '../api/woocommerce';
+import { createOrder, getOrderById, getProductImage, formatPrice, stripHtml, updateCustomer } from '../api/woocommerce';
 import { getProductPrice } from '../utils/helpers';
 import OrderSummaryCard from '../components/OrderSummaryCard';
 import { validarCarrito, getValidationMessage } from '../utils/cartValidation';
@@ -297,7 +297,21 @@ export default function CheckoutScreen() {
     }
     const res = await createOrder(payload);
     if (res.success && res.data) {
-      handleOrderSuccess(res.data);
+      // FIX: order-verify-bug — confirm the order actually persisted in WooCommerce
+      // before showing the success screen. A server-side plugin hook could have
+      // cancelled/trashed the order after the 201 response was sent.
+      // Was: blindly trust res.data → success screen even if order is gone server-side
+      // Now: re-fetch the order; if it's missing or cancelled, show an error
+      const orderId = res.data.id;
+      const verifyRes = await getOrderById(orderId);
+      if (verifyRes.success && verifyRes.data && verifyRes.data.status !== 'cancelled' && verifyRes.data.status !== 'trash') {
+        handleOrderSuccess(verifyRes.data);
+      } else {
+        Alert.alert(
+          'Error al confirmar el pedido',
+          `Tu pedido (#${orderId}) fue creado pero quedó en estado inválido. Contacta soporte con ese número.`
+        );
+      }
     } else {
       // Bug5: timeout may mean order was created server-side — warn user to check orders
       const isTimeout = (res.error || '').includes('Tiempo de espera');
@@ -334,6 +348,20 @@ export default function CheckoutScreen() {
       return;
     }
     setErrors({});
+
+    // FIX: guest-order-bug — if customerId is 0 the order is created as a guest
+    // and will NOT appear under the consultant's customer record in WooCommerce admin.
+    // This happens when findCustomerByEmail returns null (slow network, email mismatch).
+    // Was: silently send customer_id:0 → ghost guest order created → admin can't find it
+    // Now: block submission and prompt user to re-login so their WC customer record loads
+    if (!user?.customerId) {
+      Alert.alert(
+        'Error de sesión',
+        'No se pudo verificar tu cuenta. Por favor cierra sesión, vuelve a iniciar sesión e intenta de nuevo.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
 
     submittingRef.current = true;
 
