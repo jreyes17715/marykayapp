@@ -1,5 +1,5 @@
 # Reglas de Negocio — Aroma del Rosal
-> Última actualización: 2026-04-10
+> Última actualización: 2026-04-13
 > Este archivo es leído por TODOS los agentes antes de cada tarea.
 > Agregar reglas aquí cuando se descubran o se definan.
 
@@ -48,11 +48,18 @@
 - **Razón:** Control administrativo para casos de fraude, deuda u otras situaciones que requieran suspension inmediata.
 - **Desde:** 2026-04-10
 
-### RULE-009: Reactivacion desde INACTIVE
-- **Descripción:** Una consultora en estado INACTIVE puede volver a ACTIVE si completa una compra con total >= RD$20,000. Al confirmarse la orden, se actualiza `_kit_last_active_purchase_ts` con el timestamp Unix actual, reiniciando el rolling window de 3 meses.
-- **Flujo:** Checkout completado → orden processing/completed → actualizar meta `_kit_last_active_purchase_ts` → estado resuelto como ACTIVE en siguiente evaluacion.
+### RULE-009: Reactivacion desde INACTIVE (compra unica de 20k)
+- **Descripción:** Una consultora en estado INACTIVE debe realizar una compra minima de RD$20,000 para reactivarse. Esta regla aplica UNICAMENTE a la primera compra mientras permanezca inactiva. Una vez la compra sea aprobada/completada y la flag cambie a ACTIVE, las compras posteriores vuelven al minimo estandar de RD$1,000.
+- **Flujo completo:**
+  1. Estado INACTIVE → checkout exige 20,000 minimo
+  2. Compra >= 20,000 se aprueba
+  3. `handleOrderSuccess` llama `getTransitionAfterPurchase('inactive', total, ...)` → retorna 'active'
+  4. `buildMetaUpdatesForTransition('active', { fromInactive: true })` actualiza en WooCommerce: `consultant_state='active'`, `_kit_last_active_purchase_ts=<now>`, `_kit_activa_confirmada='1'`
+  5. `refreshUserData` reconstruye user → `restrictionState = null` → minimo vuelve a 1,000
+  6. Siguientes compras usan regla ACTIVE normal (1,000)
+- **Garantias:** La validacion de 20,000 NO se repite despues de reactivacion. `resolveRestrictionState` confia en state INACTIVE directamente (no re-valida). Despues de transicion, `shouldMarkInactive(<fresh_ts>)` retorna false.
 - **Razón:** Permite reactivacion organica sin intervencion de soporte, a diferencia de DISABLED.
-- **Desde:** 2026-04-10
+- **Desde:** 2026-04-10 (flujo completo verificado 2026-04-13)
 
 ### RULE-007: Seccion 2 = Productos con Descuento
 - **Descripción:** "Seccion 2" se refiere a productos que tienen algun tipo de descuento aplicado (esNeto !== true). "Seccion 1" son productos a precio neto (0% descuento). El minimo de RD$1,000 para ACTIVE solo cuenta productos de seccion 2.
