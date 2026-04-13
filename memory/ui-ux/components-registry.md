@@ -18,6 +18,7 @@
 |---|---|---|---|
 | CategoryGridCard | default, loading (skeleton) | HomeScreen via CategoryGrid | White card, #FDF1F5 icon circle, Feather icon 26pt, borderRadius 12, shadow from theme |
 | CategoryGrid | default, loading | HomeScreen | 2-col flexWrap grid, gap 12, resolves Feather icons by slug/name |
+| InactiveUserBanner | visible (restrictionState==='inactive'), hidden (returns null) | AppNavigator (global) | Fondo #f59e0b, texto blanco bold centrado, no-dismissible, auto-oculta cuando restrictionState cambia |
 
 ## Decisiones de UI
 

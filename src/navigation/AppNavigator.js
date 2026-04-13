@@ -17,6 +17,7 @@ import ConsultantListScreen from '../screens/ConsultantListScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import BlockedScreen from '../screens/BlockedScreen';
 import LoadingSpinner from '../components/LoadingSpinner';
+import InactiveUserBanner from '../components/InactiveUserBanner';
 import { CartContext } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import colors from '../constants/colors';
@@ -283,7 +284,12 @@ export default function AppNavigator() {
 
   return (
     <NavigationContainer>
-      {isLoggedIn ? <MainTabs /> : <AuthNavigator />}
+      {isLoggedIn ? (
+        <View style={{ flex: 1 }}>
+          <InactiveUserBanner />
+          <MainTabs />
+        </View>
+      ) : <AuthNavigator />}
     </NavigationContainer>
   );
 }
