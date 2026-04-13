@@ -2,6 +2,12 @@
 > Escribir una entrada después de CADA implementación.
 > Este log se consolida semanalmente para extraer patrones nuevos.
 
+## 2026-04-13 — InactiveUserBanner: componente global de aviso para estado INACTIVE
+- Tarea: Crear src/components/InactiveUserBanner.js y modificar AppNavigator.js para mostrarlo globalmente cuando user.restrictionState === 'inactive'
+- Resultado: aprobado
+- Tiempo: ~5 minutos
+- Aprendizaje: View ya estaba importado en AppNavigator — no fue necesario ningun import adicional. El banner se coloca DENTRO de NavigationContainer pero FUERA de MainTabs, envueltos en View flex:1 para que el banner tome su altura natural y MainTabs ocupe el resto. El bloque blocked (linea 281) permanece ANTES del NavigationContainer — usuarios bloqueados no llegan al banner.
+
 ## 2026-04-13 — Fix 3 persistent bugs: kit state, INACTIVE min, blocked login
 - Tarea: Corregir 3 bugs persistentes: (1) estado kit se invierte post-compra, (2) usuario INACTIVE ve minimo 1k en vez de 20k, (3) usuario bloqueado ve texto crudo 'is_deactived' al login
 - Resultado: aprobado (reviewer: approve with changes — T004 match broadened)
