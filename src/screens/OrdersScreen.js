@@ -55,7 +55,16 @@ export default function OrdersScreen() {
   const [error, setError] = useState('');
 
   const loadOrders = useCallback(async () => {
-    const customerId = user?.customerId ?? 0;
+    // FIX: order-leak-customer-0 — if customerId is 0 or absent the user has no
+    // WooCommerce customer record yet. Calling the API with id=0 returns all
+    // store orders. Show empty state instead.
+    // Was: customerId ?? 0 passed unconditionally → Now: guard blocks id <= 0
+    const customerId = user?.customerId;
+    if (!customerId || customerId <= 0) {
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     const res = await getOrdersByCustomer(customerId);

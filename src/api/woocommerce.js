@@ -129,12 +129,17 @@ export function createOrder(orderData) {
 
 /**
  * Obtiene las órdenes de un cliente por ID.
- * WooCommerce acepta el parámetro "customer" (integer).
- * Si customerId es 0, se pide igual (órdenes de invitado).
+ * WooCommerce acepta el parámetro "customer" (integer > 0).
+ * customer=0 en la API de WC NO filtra por invitado — devuelve TODAS las
+ * órdenes de la tienda. Por eso se bloquea cualquier id <= 0.
  */
 export async function getOrdersByCustomer(customerId, page = 1) {
   const id = typeof customerId === 'number' ? customerId : parseInt(customerId, 10);
-  if (Number.isNaN(id) || id < 0) {
+  // FIX: order-leak-customer-0 — WC REST API with customer=0 returns ALL store
+  // orders (no filter), not guest orders. Block 0 and below to prevent leaking
+  // other customers' data to the authenticated user.
+  // Was: id < 0 (allowed 0 through) → Now: id <= 0 (blocks 0 too)
+  if (Number.isNaN(id) || id <= 0) {
     return { success: true, data: [] };
   }
   try {

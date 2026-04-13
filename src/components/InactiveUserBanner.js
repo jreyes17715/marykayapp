@@ -1,18 +1,16 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 
 export default function InactiveUserBanner() {
   const { user } = useAuth();
-  const insets = useSafeAreaInsets();
 
   if (user?.restrictionState !== 'inactive') {
     return null;
   }
 
   return (
-    <View style={[styles.banner, { paddingTop: insets.top || 10 }]}>
+    <View style={styles.banner}>
       <Text style={styles.text}>
         Tu cuenta está inactiva. Para reactivarla necesitas un pedido mínimo de RD$ 20,000 en productos con descuento.
       </Text>

@@ -89,6 +89,8 @@ export default function CartScreen() {
   // INACTIVE y ACTIVE usan solo productos con descuento (seccion 2) para el minimo
   const totalParaProgreso = useMemo(() => {
     if (user?.restrictionState === 'inactive') return calcularTotalSeccion2(cartItems, user);
+    const state = user?.consultantState;
+    if (state === 'active') return calcularTotalSeccion2(cartItems, user);
     return totalConDescuento;
   }, [user, cartItems, totalConDescuento]);
   const progressPct = showProgress
@@ -411,14 +413,6 @@ export default function CartScreen() {
         </View>
       ) : null}
 
-      {user?.restrictionState === 'inactive' && (
-        <View style={styles.inactiveBanner}>
-          <Text style={styles.inactiveBannerText}>
-            Tu cuenta esta inactiva. Tu proxima compra debe ser de minimo RD$20,000 para reactivar tu cuenta.
-          </Text>
-        </View>
-      )}
-
       <FlatList
         data={cartItems}
         renderItem={renderItem}
@@ -433,7 +427,7 @@ export default function CartScreen() {
       />
 
       {showProgress && (
-        <View style={styles.progressWrap}>
+        <View style={[styles.progressWrap, { bottom: bottomHeight + 16 }]}>
           <View style={styles.progressBarBg}>
             <View
               style={[
@@ -448,7 +442,7 @@ export default function CartScreen() {
           <Text style={styles.progressText}>
             {progressReached
               ? '✓ Mínimo alcanzado'
-              : `RD$ ${totalConDescuento.toLocaleString('es-DO', { minimumFractionDigits: 2 })} de RD$ ${minRequired.toLocaleString('es-DO')} mínimo`}
+              : `RD$ ${totalParaProgreso.toLocaleString('es-DO', { minimumFractionDigits: 2 })} de RD$ ${minRequired.toLocaleString('es-DO')} mínimo`}
           </Text>
         </View>
       )}
@@ -539,7 +533,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 16,
-    bottom: 200,
   },
   progressBarBg: {
     height: 8,
@@ -837,21 +830,5 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  inactiveBanner: {
-    backgroundColor: '#fef3c7',
-    borderLeftWidth: 4,
-    borderLeftColor: '#f59e0b',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 8,
-    borderRadius: 6,
-  },
-  inactiveBannerText: {
-    color: '#92400e',
-    fontSize: 13,
-    lineHeight: 19,
   },
 });
