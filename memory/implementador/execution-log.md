@@ -2,6 +2,18 @@
 > Escribir una entrada después de CADA implementación.
 > Este log se consolida semanalmente para extraer patrones nuevos.
 
+## 2026-04-13 — Fix 3 persistent bugs: kit state, INACTIVE min, blocked login
+- Tarea: Corregir 3 bugs persistentes: (1) estado kit se invierte post-compra, (2) usuario INACTIVE ve minimo 1k en vez de 20k, (3) usuario bloqueado ve texto crudo 'is_deactived' al login
+- Resultado: aprobado (reviewer: approve with changes — T004 match broadened)
+- Tiempo: ~20 minutos
+- Commits: 687adc7, 21788e5, 2dddd6f, faf9942, 2f92cf7 (5 commits, 4 archivos)
+- Aprendizaje:
+  - resolveRestrictionState no debe re-validar estados ya determinados: si consultantState es INACTIVE, confiarlo directamente
+  - hasBoughtKit es flag monotónico: una vez true, nunca debe revertir a false. refreshUserData debe preservarlo
+  - ProfileScreen necesita caso para CADA estado posible, no asumir que else cubre todo
+  - Errores de plugins WP pueden ser strings arbitrarios — usar substring match amplio ('deactiv') no exacto
+  - loadUserFromToken quedo como dead code tras refactor de refreshUserData (low priority cleanup)
+
 ## 2026-04-11 — Bugfix batch: 10 critical bugs (7 commits)
 - Tarea: Auditar y corregir 10 bugs criticos: persistencia carrito, kit auto-add, billing perdido, falso error carrito, timeout orden, kit flag, badge notificaciones, BlockedScreen UX, validacion INACTIVE, kit state flip
 - Resultado: aprobado (reviewer: approve with changes, H1+H2+M4 corregidos)

@@ -1,7 +1,7 @@
 # Errores Conocidos y Fixes
 > LEE ESTE ARCHIVO ANTES DE IMPLEMENTAR. Evita repetir errores.
 > Aplica a TODOS los agentes, no solo al implementador.
-> Última actualización: 2026-03-25
+> Última actualización: 2026-04-13
 
 ## ERROR-001: babel-preset-expo no disponible
 - **Síntoma:** Build falla buscando babel-preset-expo
@@ -49,6 +49,38 @@
 - **Fix:** Pre-aplicar shouldMarkInactive antes de resolveRestrictionState en buildUserFromToken
 - **Módulos afectados:** AuthContext.js
 - **Ocurrencias:** 1 (commit e02fe78)
+- **Status:** Corregido (parcial — ver ERROR-008)
+
+## ERROR-008: resolveRestrictionState re-valida INACTIVE innecesariamente
+- **Síntoma:** Usuario con consultantState='inactive' ve minimo 1,000 (ACTIVE) en vez de 20,000
+- **Causa:** resolveRestrictionState re-llamaba isInactive() incluso cuando state ya era 'inactive'. Si timestamp edge case causaba false, restrictionState quedaba null
+- **Fix:** Confiar en state INACTIVE directamente. Solo llamar isInactive() para ACTIVE.
+- **Módulos afectados:** consultantState.js
+- **Ocurrencias:** 1 (commit 687adc7)
+- **Status:** Corregido
+
+## ERROR-009: hasBoughtKit revierte a false tras refreshUserData
+- **Síntoma:** Perfil muestra "kit comprado", usuario compra, perfil cambia a "kit pendiente"
+- **Causa:** refreshUserData reemplazaba user completo. Si WooCommerce omitia has_bought_kit meta, parseBool(null)=false
+- **Fix:** Hacer hasBoughtKit monotónico en refreshUserData (una vez true, nunca revert). Heal consultantState de NEW a ACTIVE.
+- **Módulos afectados:** AuthContext.js
+- **Ocurrencias:** 1 (commit 21788e5)
+- **Status:** Corregido
+
+## ERROR-010: ProfileScreen no maneja estado INACTIVE
+- **Síntoma:** Usuario INACTIVE ve "Cuenta deshabilitada" en vez de "Kit Comprado" + aviso reactivacion
+- **Causa:** if-else chain no tenia caso para INACTIVE, caia al else/disabled catch-all
+- **Fix:** Agregar caso INACTIVE entre PENALIZED y ACTIVE
+- **Módulos afectados:** ProfileScreen.js
+- **Ocurrencias:** 1 (commit 2dddd6f)
+- **Status:** Corregido
+
+## ERROR-011: Blocked user ve texto crudo 'is_deactived' al login
+- **Síntoma:** Usuario bloqueado intenta login y ve texto técnico 'is_deactived'
+- **Causa:** Plugin WP user-deactivator retorna 403 con message conteniendo 'deactiv'. LoginScreen no reconocia el error.
+- **Fix:** Detectar substring 'deactiv' en errMsg y mostrar Alert de Cuenta Bloqueada con email soporte
+- **Módulos afectados:** LoginScreen.js
+- **Ocurrencias:** 1 (commit faf9942, fix 2f92cf7)
 - **Status:** Corregido
 
 ## ERROR-002: worklets-core conflicto con reanimated 4.x
