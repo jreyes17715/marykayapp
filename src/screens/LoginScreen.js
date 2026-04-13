@@ -60,7 +60,7 @@ export default function LoginScreen() {
           'Tu cuenta ha sido deshabilitada. Por favor contacta a soporte para mas informacion.',
           [{ text: 'Entendido' }]
         );
-      } else if (errMsg.includes('is_deactiv')) {
+      } else if (errMsg.includes('deactiv')) {
         Alert.alert(
           'Cuenta Bloqueada',
           'Tu usuario fue inhabilitado. Para mas informacion debes contactar a soporte en soporte@aromadelrosal.com',
