@@ -87,7 +87,7 @@ export default function OrdersScreen() {
     setRefreshing(false);
   }, [loadOrders]);
 
-  const renderItem = ({ item }) => {
+  const renderItem = useCallback(({ item }) => {
     const statusInfo = mapStatus(item.status);
     const total = formatPrice(item.total);
     const productsCount = Array.isArray(item.line_items)
@@ -113,13 +113,14 @@ export default function OrdersScreen() {
             style={styles.detailsBtn}
             onPress={() => navigation.navigate('OrderTracking', { order: item })}
             activeOpacity={0.8}
+            accessibilityLabel={`Orden #${item.id}`}
           >
             <Text style={styles.detailsText}>Ver →</Text>
           </TouchableOpacity>
         </View>
       </View>
     );
-  };
+  }, [navigation]);
 
   const keyExtractor = (item) => String(item.id);
 

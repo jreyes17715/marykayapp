@@ -42,6 +42,8 @@ export default function QuantitySelector({
         onPress={onDecrement}
         disabled={!canDecrement}
         activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Disminuir cantidad"
       >
         <Text
           style={[
@@ -69,6 +71,8 @@ export default function QuantitySelector({
         onPress={onIncrement}
         disabled={!canIncrement}
         activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Aumentar cantidad"
       >
         <Text
           style={[

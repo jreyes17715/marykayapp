@@ -63,10 +63,10 @@ describe('Cart Rules Constants', () => {
     expect(KIT_PRODUCT_ID).not.toBe(PREMIO_PRODUCT_ID);
   });
 
-  it('CONSULTANT_STATES has exactly 4 states', () => {
+  it('CONSULTANT_STATES has exactly 6 states', () => {
     const keys = Object.keys(CONSULTANT_STATES);
-    expect(keys).toHaveLength(4);
-    expect(keys).toEqual(expect.arrayContaining(['NEW', 'ACTIVE', 'PENALIZED', 'DISABLED']));
+    expect(keys).toHaveLength(6);
+    expect(keys).toEqual(expect.arrayContaining(['NEW', 'ACTIVE', 'PENALIZED', 'DISABLED', 'BLOCKED', 'INACTIVE']));
   });
 
   it('CONSULTANT_STATES values are lowercase strings', () => {
@@ -74,6 +74,8 @@ describe('Cart Rules Constants', () => {
     expect(CONSULTANT_STATES.ACTIVE).toBe('active');
     expect(CONSULTANT_STATES.PENALIZED).toBe('penalized');
     expect(CONSULTANT_STATES.DISABLED).toBe('disabled');
+    expect(CONSULTANT_STATES.BLOCKED).toBe('blocked');
+    expect(CONSULTANT_STATES.INACTIVE).toBe('inactive');
   });
 });
 

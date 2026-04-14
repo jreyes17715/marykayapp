@@ -239,6 +239,7 @@ export default function StoreScreen() {
             onChangeText={setSearchInput}
             returnKeyType="search"
             onSubmitEditing={() => Keyboard.dismiss()}
+            accessibilityLabel="Buscar productos"
           />
         </View>
         <TwoTierCategoryNav
@@ -296,6 +297,8 @@ export default function StoreScreen() {
           <TouchableOpacity
             style={styles.retryBtn}
             onPress={() => loadInitial()}
+            accessibilityRole="button"
+            accessibilityLabel="Reintentar carga de productos"
           >
             <Text style={styles.retryBtnText}>Reintentar</Text>
           </TouchableOpacity>

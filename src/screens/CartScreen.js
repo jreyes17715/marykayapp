@@ -3,7 +3,6 @@ import {
   View,
   Text,
   FlatList,
-  Image,
   TouchableOpacity,
   StyleSheet,
   Alert,
@@ -13,6 +12,7 @@ import {
   ActivityIndicator,
   Modal,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -277,7 +277,10 @@ export default function CartScreen() {
             <Image
               source={{ uri: getProductImage(product) }}
               style={styles.thumbnail}
-              resizeMode="cover"
+              contentFit="cover"
+              placeholder={null}
+              transition={200}
+              cachePolicy="memory-disk"
             />
             <View style={styles.itemInfo}>
               <Text style={styles.itemName} numberOfLines={2}>

@@ -55,7 +55,13 @@ function diasRestantes(dateStr) {
 
 function MenuRow({ iconName, label, onPress, danger }) {
   return (
-    <TouchableOpacity style={styles.menuRow} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={styles.menuRow}
+      onPress={onPress}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
       <Feather
         name={iconName}
         size={20}
@@ -106,6 +112,8 @@ export default function ProfileScreen() {
           style={styles.primaryBtn}
           onPress={() => navigation.navigate('Login')}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Iniciar sesión"
         >
           <Text style={styles.primaryBtnText}>Iniciar Sesión</Text>
         </TouchableOpacity>
@@ -187,6 +195,8 @@ export default function ProfileScreen() {
               style={styles.kitButton}
               onPress={() => navigation.navigate('Tienda')}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Comprar Kit Inicial"
             >
               <Text style={styles.kitButtonText}>Comprar Kit Inicial →</Text>
             </TouchableOpacity>
@@ -254,6 +264,8 @@ export default function ProfileScreen() {
           style={styles.modalOverlay}
           activeOpacity={1}
           onPress={() => setAddressModalVisible(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Cerrar modal de dirección"
         >
           <TouchableOpacity
             style={styles.modalCard}
@@ -270,6 +282,8 @@ export default function ProfileScreen() {
               style={styles.modalCloseBtn}
               onPress={() => setAddressModalVisible(false)}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Cerrar modal de dirección"
             >
               <Text style={styles.modalCloseText}>Cerrar</Text>
             </TouchableOpacity>

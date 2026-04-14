@@ -41,6 +41,8 @@ export default function BlockedScreen() {
           style={styles.buttonPrimary}
           onPress={handleContactarSoporte}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Contactar soporte por correo electrónico"
         >
           <Feather name="mail" size={18} color="#ffffff" style={styles.btnIcon} />
           <Text style={styles.buttonPrimaryText}>Contactar Soporte</Text>
@@ -50,6 +52,8 @@ export default function BlockedScreen() {
           style={styles.buttonGhost}
           onPress={logout}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Cerrar sesión"
         >
           <Text style={styles.buttonGhostText}>Cerrar Sesion</Text>
         </TouchableOpacity>

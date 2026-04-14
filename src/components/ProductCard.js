@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
-  Image,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { getProductImage, formatPrice, stripHtml } from '../api/woocommerce';
@@ -19,8 +18,6 @@ const BADGE_NETO = '#777';
 const BADGE_ESPECIAL = '#9b59b6';
 const BADGE_NIVEL = '#00947e';
 
-const IMAGE_LOAD_TIMEOUT_MS = 15000;
-
 function useProductStock(product) {
   if (!product) return { inStock: false, label: 'Agotado', labelColor: colors.primary };
   const qty = product.stock_quantity;
@@ -31,42 +28,15 @@ function useProductStock(product) {
   return { inStock: true, label: 'En stock', labelColor: colors.success };
 }
 
-export default function ProductCard({ product, onPress }) {
+function ProductCard({ product, onPress }) {
   const { user } = useAuth();
   const { addToCart, getItemQuantity, incrementQuantity, decrementQuantity } = useCart();
-  const [imageLoading, setImageLoading] = useState(true);
   const [justAdded, setJustAdded] = useState(false);
-  const timeoutRef = useRef(null);
   const quantity = getItemQuantity(product.id);
 
   const imageUri = getProductImage(product);
   const priceInfo = calcularPrecioFinal(product, user);
 
-  useEffect(() => {
-    setImageLoading(true);
-    timeoutRef.current = setTimeout(() => {
-      setImageLoading(false);
-    }, IMAGE_LOAD_TIMEOUT_MS);
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, [imageUri]);
-
-  const handleImageLoad = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    setImageLoading(false);
-  };
-
-  const handleImageError = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    setImageLoading(false);
-  };
   const { inStock, label, labelColor } = useProductStock(product);
 
   const handleAddToCart = () => {
@@ -87,16 +57,11 @@ export default function ProductCard({ product, onPress }) {
         <Image
           source={{ uri: imageUri }}
           style={styles.image}
-          resizeMode="cover"
-          onLoad={handleImageLoad}
-          onLoadEnd={handleImageLoad}
-          onError={handleImageError}
+          contentFit="cover"
+          placeholder={null}
+          transition={200}
+          cachePolicy="memory-disk"
         />
-        {imageLoading && (
-          <View style={styles.imagePlaceholder}>
-            <ActivityIndicator size="small" color={colors.primary} />
-          </View>
-        )}
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -195,6 +160,8 @@ export default function ProductCard({ product, onPress }) {
   );
 }
 
+export default React.memo(ProductCard);
+
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.white,
@@ -214,12 +181,6 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
-  },
-  imagePlaceholder: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.lightGray,
   },
   nameWrap: {
     marginTop: 8,

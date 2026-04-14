@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -40,6 +40,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const passwordRef = useRef(null);
 
   const handleLogin = async () => {
     const user = (username || '').trim();
@@ -87,17 +88,26 @@ export default function LoginScreen() {
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
+          returnKeyType="next"
+          onSubmitEditing={() => passwordRef.current?.focus()}
           editable={!loading}
+          accessibilityLabel="Nombre de usuario"
         />
         <View style={styles.passwordWrap}>
           <TextInput
+            ref={passwordRef}
             style={styles.passwordInput}
             value={password}
             onChangeText={(t) => { setPassword(t); setError(''); }}
             placeholder="Contraseña"
             placeholderTextColor={colors.gray}
             secureTextEntry={!showPassword}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="go"
+            onSubmitEditing={handleLogin}
             editable={!loading}
+            accessibilityLabel="Contraseña"
           />
           <TouchableOpacity
             onPress={() => setShowPassword(!showPassword)}
@@ -128,6 +138,8 @@ export default function LoginScreen() {
           onPress={handleLogin}
           disabled={loading}
           activeOpacity={0.8}
+          accessibilityLabel="Iniciar sesión"
+          accessibilityRole="button"
         >
           {loading ? (
             <ActivityIndicator color={colors.white} size="small" />

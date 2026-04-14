@@ -315,6 +315,8 @@ export default function OrderTrackingScreen() {
           onPress={handleCancel}
           disabled={cancelling}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Cancelar pedido"
         >
           {cancelling ? (
             <ActivityIndicator color="#ef4444" size="small" />

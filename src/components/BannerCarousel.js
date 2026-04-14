@@ -5,10 +5,10 @@ import {
   FlatList,
   Dimensions,
   StyleSheet,
-  Image,
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { getProducts, getProductImage } from '../api/woocommerce';
 import colors from '../constants/colors';
@@ -32,7 +32,14 @@ function BannerSlide({ item, onPress }) {
         activeOpacity={0.9}
         disabled={!item.productId}
       >
-        <Image source={{ uri: item.image }} style={styles.slideImage} resizeMode="cover" />
+        <Image
+          source={{ uri: item.image }}
+          style={styles.slideImage}
+          contentFit="cover"
+          placeholder={null}
+          transition={200}
+          cachePolicy="memory-disk"
+        />
         <View style={styles.slideOverlay}>
           <Text style={styles.slideText} numberOfLines={2}>{item.title}</Text>
         </View>

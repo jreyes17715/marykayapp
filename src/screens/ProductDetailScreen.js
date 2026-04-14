@@ -3,12 +3,12 @@ import {
   View,
   Text,
   ScrollView,
-  Image,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { getProductById, getProductImage, formatPrice, stripHtml } from '../api/woocommerce';
 import { useCart } from '../context/CartContext';
@@ -169,7 +169,10 @@ export default function ProductDetailScreen() {
                     key={img.id || i}
                     source={{ uri: typeof img === 'object' ? img.src : img }}
                     style={[styles.galleryImage, { width: SCREEN_WIDTH }]}
-                    resizeMode="contain"
+                    contentFit="contain"
+                    placeholder={null}
+                    transition={200}
+                    cachePolicy="memory-disk"
                   />
                 ))}
               </ScrollView>
@@ -186,7 +189,10 @@ export default function ProductDetailScreen() {
             <Image
               source={{ uri: typeof images[0] === 'object' ? images[0].src : images[0] }}
               style={styles.galleryImageSingle}
-              resizeMode="contain"
+              contentFit="contain"
+              placeholder={null}
+              transition={200}
+              cachePolicy="memory-disk"
             />
           )}
         </View>

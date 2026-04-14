@@ -130,7 +130,11 @@ export default function ConsultantListScreen() {
   }, [consultoras, searchText, selectedProvincia, selectedCiudad]);
 
   const renderItem = ({ item }) => (
-    <View style={styles.card}>
+    <View
+      style={styles.card}
+      accessible={true}
+      accessibilityLabel={`Consultora: ${item.nombre}`}
+    >
       <View style={styles.cardRowTop}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{item.iniciales}</Text>
@@ -207,6 +211,7 @@ export default function ConsultantListScreen() {
           value={searchText}
           onChangeText={setSearchText}
           autoCapitalize="none"
+          accessibilityLabel="Buscar consultora por nombre o correo"
         />
       </View>
 
@@ -221,7 +226,12 @@ export default function ConsultantListScreen() {
       {error ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={loadConsultants}>
+          <TouchableOpacity
+            style={styles.retryBtn}
+            onPress={loadConsultants}
+            accessibilityRole="button"
+            accessibilityLabel="Reintentar carga de consultoras"
+          >
             <Text style={styles.retryText}>Reintentar</Text>
           </TouchableOpacity>
         </View>

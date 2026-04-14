@@ -284,7 +284,7 @@ export function CartProvider({ children }) {
     return item ? item.quantity : 0;
   }, [cartItems]);
 
-  const value = {
+  const value = useMemo(() => ({
     cartItems,
     totalItems,
     totalPrice,
@@ -307,7 +307,30 @@ export function CartProvider({ children }) {
     clearCart,
     getItemQuantity,
     isRestored,
-  };
+  }), [
+    cartItems,
+    totalItems,
+    totalPrice,
+    subtotalOriginal,
+    totalConDescuento,
+    discountNivel,
+    discountEspeciales,
+    totalNetos,
+    hasPremio,
+    totalSinPremio,
+    shippingProvince,
+    shippingCost,
+    shipping,
+    setShippingProvince,
+    addToCart,
+    removeFromCart,
+    updateQuantity,
+    incrementQuantity,
+    decrementQuantity,
+    clearCart,
+    getItemQuantity,
+    isRestored,
+  ]);
 
   return (
     <CartContext.Provider value={value}>

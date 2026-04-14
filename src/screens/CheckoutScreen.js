@@ -471,7 +471,12 @@ export default function CheckoutScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.emptyText}>Tu carrito está vacío</Text>
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          style={styles.primaryBtn}
+          onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Volver al carrito"
+        >
           <Text style={styles.primaryBtnText}>Volver al carrito</Text>
         </TouchableOpacity>
       </View>
@@ -489,7 +494,13 @@ export default function CheckoutScreen() {
           Tu orden #{orderId} ha sido creada exitosamente
         </Text>
         <Text style={styles.successNote}>Recibirás un correo de confirmación</Text>
-        <TouchableOpacity style={styles.primaryBtn} onPress={goHome} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={styles.primaryBtn}
+          onPress={goHome}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Volver al inicio"
+        >
           <Text style={styles.primaryBtnText}>Volver al Inicio</Text>
         </TouchableOpacity>
       </View>
@@ -518,6 +529,8 @@ export default function CheckoutScreen() {
           style={styles.sectionHeader}
           onPress={() => setOrderSummaryExpanded((e) => !e)}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={orderSummaryExpanded ? 'Contraer resumen del pedido' : 'Expandir resumen del pedido'}
         >
           <Text style={styles.sectionTitle}>Resumen del Pedido</Text>
           <Text style={styles.expandIcon}>{orderSummaryExpanded ? '▼' : '▶'}</Text>
@@ -565,6 +578,7 @@ export default function CheckoutScreen() {
             placeholder="Tu nombre"
             placeholderTextColor={colors.gray}
             autoCapitalize="words"
+            accessibilityLabel="Nombre"
           />
           {errors.firstName ? <Text style={styles.errorText}>{errors.firstName}</Text> : null}
 
@@ -576,6 +590,7 @@ export default function CheckoutScreen() {
             placeholder="Tu apellido"
             placeholderTextColor={colors.gray}
             autoCapitalize="words"
+            accessibilityLabel="Apellido"
           />
           {errors.lastName ? <Text style={styles.errorText}>{errors.lastName}</Text> : null}
 
@@ -588,6 +603,7 @@ export default function CheckoutScreen() {
             placeholderTextColor={colors.gray}
             keyboardType="email-address"
             autoCapitalize="none"
+            accessibilityLabel="Correo electrónico"
           />
           {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
 
@@ -599,6 +615,7 @@ export default function CheckoutScreen() {
             placeholder="8 dígitos mínimo"
             placeholderTextColor={colors.gray}
             keyboardType="phone-pad"
+            accessibilityLabel="Teléfono"
           />
           {errors.phone ? <Text style={styles.errorText}>{errors.phone}</Text> : null}
         </View>
@@ -613,6 +630,7 @@ export default function CheckoutScreen() {
             onChangeText={(v) => updateForm('address', v)}
             placeholder="Calle, número, zona"
             placeholderTextColor={colors.gray}
+            accessibilityLabel="Dirección"
           />
           {errors.address ? <Text style={styles.errorText}>{errors.address}</Text> : null}
 
@@ -623,6 +641,7 @@ export default function CheckoutScreen() {
             onChangeText={(v) => updateForm('city', v)}
             placeholder="Ciudad"
             placeholderTextColor={colors.gray}
+            accessibilityLabel="Ciudad"
           />
           {errors.city ? <Text style={styles.errorText}>{errors.city}</Text> : null}
 
@@ -633,6 +652,7 @@ export default function CheckoutScreen() {
             onChangeText={(v) => updateForm('state', v)}
             placeholder="Opcional"
             placeholderTextColor={colors.gray}
+            accessibilityLabel="Departamento o provincia"
           />
 
           <Text style={styles.label}>País</Text>
@@ -642,6 +662,9 @@ export default function CheckoutScreen() {
             style={styles.checkboxRow}
             onPress={() => setSameAsBilling((v) => !v)}
             activeOpacity={0.7}
+            accessibilityRole="checkbox"
+            accessibilityLabel="Usar la misma dirección para facturación"
+            accessibilityState={{ checked: sameAsBilling }}
           >
             <View style={[styles.checkbox, sameAsBilling && styles.checkboxChecked]}>
               {sameAsBilling ? <Text style={styles.checkboxTick}>✓</Text> : null}
@@ -657,6 +680,9 @@ export default function CheckoutScreen() {
             style={styles.paymentOption}
             onPress={() => setPaymentMethod(PAYMENT_METHODS.TRANSFER)}
             activeOpacity={0.7}
+            accessibilityRole="radio"
+            accessibilityLabel="Transferencia bancaria"
+            accessibilityState={{ checked: paymentMethod === PAYMENT_METHODS.TRANSFER }}
           >
             <View style={styles.paymentRow}>
               <View style={[
@@ -678,6 +704,9 @@ export default function CheckoutScreen() {
             style={styles.paymentOption}
             onPress={() => setPaymentMethod(PAYMENT_METHODS.CARD)}
             activeOpacity={0.7}
+            accessibilityRole="radio"
+            accessibilityLabel="Pago con tarjeta"
+            accessibilityState={{ checked: paymentMethod === PAYMENT_METHODS.CARD }}
           >
             <View style={styles.paymentRow}>
               <View style={[
@@ -731,6 +760,13 @@ export default function CheckoutScreen() {
           onPress={handleConfirm}
           disabled={loading || cartInvalid}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={
+            loading
+              ? (paymentMethod === PAYMENT_METHODS.CARD ? 'Iniciando pago...' : 'Creando pedido...')
+              : (paymentMethod === PAYMENT_METHODS.CARD ? 'Pagar con tarjeta' : 'Confirmar pedido')
+          }
+          accessibilityState={{ disabled: loading || cartInvalid }}
         >
           {loading ? (
             <Text style={styles.confirmBtnText}>

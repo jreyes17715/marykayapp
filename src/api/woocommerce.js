@@ -1,21 +1,10 @@
 import axios from 'axios';
 import config from '../constants/config';
+import { formatPrice, stripHtml } from '../utils/helpers';
 
 const TIMEOUT_MS = 15000;
 
-function base64Encode(str) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-  let output = '';
-  for (let i = 0; i < str.length; i += 3) {
-    const a = str.charCodeAt(i);
-    const b = i + 1 < str.length ? str.charCodeAt(i + 1) : 0;
-    const c = i + 2 < str.length ? str.charCodeAt(i + 2) : 0;
-    const n = (a << 16) | (b << 8) | c;
-    output += chars[(n >> 18) & 63] + chars[(n >> 12) & 63] + chars[(n >> 6) & 63] + chars[n & 63];
-  }
-  const pad = str.length % 3;
-  return output.slice(0, pad ? output.length - (3 - pad) : output.length);
-}
+const base64Encode = (str) => btoa(str);
 
 const auth = base64Encode(`${config.CONSUMER_KEY}:${config.CONSUMER_SECRET}`);
 
@@ -290,20 +279,6 @@ export async function findCustomerByEmail(email) {
     // seguir
   }
 
-  try {
-    const res3 = await woocommerce.get('/customers', {
-      params: { per_page: 100, role: 'all' },
-    });
-    if (res3.data && Array.isArray(res3.data)) {
-      const found = res3.data.find(
-        (c) => c.email && String(c.email).toLowerCase() === normalizedEmail
-      );
-      if (found) return { success: true, data: found };
-    }
-  } catch (e) {
-    // seguir
-  }
-
   return { success: true, data: null };
 }
 
@@ -367,23 +342,6 @@ export function getProductImage(product) {
   return first && first.src ? first.src : PLACEHOLDER_IMAGE;
 }
 
-export function formatPrice(price) {
-  if (price === undefined || price === null || price === '') return 'RD$ 0.00';
-  const raw = typeof price === 'string' ? price : String(price);
-  const num = parseFloat(raw);
-  if (isNaN(num)) return 'RD$ 0.00';
-  const formatted = num
-    .toFixed(2)
-    .replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return `RD$ ${formatted}`;
-}
-
-export function stripHtml(html) {
-  if (!html || typeof html !== 'string') return '';
-  return html
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+export { formatPrice, stripHtml };
 
 export default woocommerce;

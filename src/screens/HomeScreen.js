@@ -80,7 +80,12 @@ export default function HomeScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={() => loadData()}>
+        <TouchableOpacity
+          style={styles.retryBtn}
+          onPress={() => loadData()}
+          accessibilityRole="button"
+          accessibilityLabel="Reintentar carga de categorías"
+        >
           <Text style={styles.retryBtnText}>Reintentar</Text>
         </TouchableOpacity>
       </View>
@@ -108,7 +113,12 @@ export default function HomeScreen() {
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Categorías</Text>
-        <TouchableOpacity onPress={handleVerTodos} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+        <TouchableOpacity
+          onPress={handleVerTodos}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityRole="button"
+          accessibilityLabel="Ver todas las categorías"
+        >
           <Text style={styles.verTodos}>Ver todos →</Text>
         </TouchableOpacity>
       </View>

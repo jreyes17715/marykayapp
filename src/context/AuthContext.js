@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   loginUser,
@@ -349,7 +349,7 @@ export function AuthProvider({ children }) {
     return () => { cancelled = true; };
   }, [evaluateQuarterlyStatus, persistToken]);
 
-  const value = {
+  const value = useMemo(() => ({
     user,
     isLoggedIn,
     isLoading,
@@ -358,7 +358,7 @@ export function AuthProvider({ children }) {
     refreshUserData,
     isTokenValid,
     evaluateQuarterlyStatus,
-  };
+  }), [user, isLoggedIn, isLoading, login, logout, refreshUserData, isTokenValid, evaluateQuarterlyStatus]);
 
   return (
     <AuthContext.Provider value={value}>

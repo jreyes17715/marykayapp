@@ -108,6 +108,8 @@ export default function NotificationsScreen() {
         onPress={() => {
           if (!item.read) toggleRead(item.id);
         }}
+        accessibilityRole="button"
+        accessibilityLabel={`Notificación: ${item.title}`}
       >
         <Text style={styles.cardTitle}>{item.title}</Text>
         <Text style={styles.cardMessage} numberOfLines={2}>
@@ -140,6 +142,8 @@ export default function NotificationsScreen() {
           <TouchableOpacity
             onPress={markAllAsRead}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Marcar todas las notificaciones como leídas"
           >
             <Text style={styles.markAllText}>Marcar todas como leídas</Text>
           </TouchableOpacity>

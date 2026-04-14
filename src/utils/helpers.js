@@ -25,14 +25,14 @@ export function getProductPrice(product) {
 }
 
 /**
- * Extrae el valor de un meta del array meta_data de un customer de WooCommerce.
- * meta_data: [{ id, key, value }, ...]
- * @param {Array} metaArray - meta_data del customer
- * @param {string} key - nombre del meta (ej: 'has_bought_kit', '_nivelpro_override_porcentaje')
- * @returns {*} valor del meta o undefined si no existe
+ * Strips HTML tags from a string, collapsing whitespace.
+ * @param {string} html
+ * @returns {string}
  */
-export function getUserMeta(metaArray, key) {
-  if (!Array.isArray(metaArray) || !key) return undefined;
-  const item = metaArray.find((m) => m && m.key === key);
-  return item === undefined ? undefined : item.value;
+export function stripHtml(html) {
+  if (!html || typeof html !== 'string') return '';
+  return html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
