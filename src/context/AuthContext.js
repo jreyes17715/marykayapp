@@ -65,16 +65,35 @@ async function buildUserFromToken(token, initialEmail) {
       getConsultantState({ hasBoughtKit: parseBool(getUserMeta(metaData, 'has_bought_kit')) });
 
     // Consultar endpoint /kit/v1/status/{userId} para estado de cuenta
+    // FIX: inactive-bypass-bug — fail SAFE on network/endpoint error.
+    // Was: catch block left needReactivation=false, silently downgrading an INACTIVE
+    //      user to their base consultantState (e.g. 'active'), bypassing the 20k minimum.
+    // Now: if the status endpoint fails, statusResolved=false and we re-read the
+    //      meta field _kit_activa_confirmada as a fallback. Only if both sources
+    //      are unavailable do we assume active (can't block access on infra failure).
     let accountDisabled = false;
     let needReactivation = false;
+    let statusResolved = false;
     try {
       const statusResult = await getAccountStatus(wpUser.id);
       if (statusResult.success) {
         accountDisabled = statusResult.accountDisabled;
         needReactivation = statusResult.needReactivation;
+        statusResolved = true;
       }
     } catch (e) {
-      // Si falla el endpoint, asumir cuenta activa para no bloquear al usuario
+      console.warn('[AUTH] getAccountStatus falló — usando fallback de meta_data:', e?.message);
+    }
+    // Fallback: if the endpoint was unreachable, derive restriction state from
+    // the _kit_activa_confirmada meta written by the wp-kit-restrictor plugin.
+    // null or '' → not yet confirmed active → treat as needs reactivation.
+    if (!statusResolved) {
+      const kitConfirmada = getUserMeta(metaData, '_kit_activa_confirmada');
+      // Only treat as reactivation-needed when the meta explicitly marks inactivity.
+      // '0' means inactive; null/'' means unset (treat as active to avoid false blocks).
+      if (kitConfirmada === '0') {
+        needReactivation = true;
+      }
     }
 
     const effectiveConsultantState =

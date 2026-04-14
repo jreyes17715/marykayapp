@@ -117,6 +117,13 @@ export default function CheckoutScreen() {
   const [azulPaymentData, setAzulPaymentData] = useState(null);
   // Fix W-2: prevent double submission
   const submittingRef = useRef(false);
+  // FIX: inactive-bypass-bug — track whether the cart passed its last validation.
+  // Was: useFocusEffect only showed an Alert (dismissible on Android), leaving the
+  //      Confirm button enabled. handleConfirm re-validates but the isRestored guard
+  //      is absent there, and a silent getAccountStatus failure could yield a wrong user state.
+  // Now: cartInvalid=true blocks the Confirm button at the UI level in addition to the
+  //      runtime guard inside handleConfirm.
+  const [cartInvalid, setCartInvalid] = useState(false);
 
   useEffect(() => {
     if (user && !formPreFilled) {
@@ -150,18 +157,23 @@ export default function CheckoutScreen() {
   // Bug3+Bug4: Don't auto-goBack (destroys billing form state). Show alert with option to go back.
   // Bug4: Guard with isRestored so validation doesn't run before cart is fully hydrated.
   // H2: Skip validation on success screen to avoid spurious alerts after checkout.
+  // FIX: inactive-bypass-bug — also set cartInvalid state so the Confirm button is
+  //      disabled at the UI level even if the user dismisses the alert on Android.
   useFocusEffect(
     useCallback(() => {
       if (!isRestored || success) return;
       const total = totalConDescuento ?? totalPrice ?? 0;
       const validation = validarCarrito(cartItems, user, total);
       if (!validation.valid) {
+        setCartInvalid(true);
         const msg = getValidationMessage(validation);
         Alert.alert(
           'Carrito no válido',
           msg || 'Tu carrito no cumple los requisitos mínimos. Revisa el carrito.',
           [{ text: 'Volver al carrito', onPress: () => navigation.goBack() }]
         );
+      } else {
+        setCartInvalid(false);
       }
     }, [cartItems, user, totalConDescuento, totalPrice, navigation, isRestored, success])
   );
@@ -715,9 +727,9 @@ export default function CheckoutScreen() {
 
       <View style={[styles.fixedBottom, { paddingBottom: Math.max(24, insets.bottom) }]}>
         <TouchableOpacity
-          style={[styles.confirmBtn, loading && styles.confirmBtnDisabled]}
+          style={[styles.confirmBtn, (loading || cartInvalid) && styles.confirmBtnDisabled]}
           onPress={handleConfirm}
-          disabled={loading}
+          disabled={loading || cartInvalid}
           activeOpacity={0.8}
         >
           {loading ? (
