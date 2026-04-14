@@ -79,16 +79,15 @@ export function validarCarrito(cartItems, user, totalConDescuento, premioTotal =
   if (!user) return { valid: true };
   if (user.role === 'administrator' || user.isAdmin) return { valid: true };
 
-  // BLOCKED: cuenta bloqueada por admin — maxima prioridad
-  if (user.restrictionState === CONSULTANT_STATES.BLOCKED) {
-    return { valid: false, type: 'blocked', minRequired: null };
-  }
-
-  // INACTIVE: minimo RD$20,000 solo en productos con descuento (seccion 2) para reactivar
+  // INACTIVE: minimo RD$20,000 en todos los productos (sin envio, sin premio) para reactivar
   if (user.restrictionState === CONSULTANT_STATES.INACTIVE) {
-    const totalS2 = calcularTotalSeccion2(cartItems, user);
-    if (totalS2 < MIN_AMOUNT_INACTIVE) {
-      return { valid: false, gap: MIN_AMOUNT_INACTIVE - totalS2, type: 'inactive', minRequired: MIN_AMOUNT_INACTIVE };
+    const totalProductos = cartItems.reduce((sum, { product, quantity }) => {
+      if (!product || product.id === PREMIO_PRODUCT_ID) return sum;
+      const info = calcularPrecioFinal(product, user);
+      return sum + info.precioFinal * quantity;
+    }, 0);
+    if (totalProductos < MIN_AMOUNT_INACTIVE) {
+      return { valid: false, gap: MIN_AMOUNT_INACTIVE - totalProductos, type: 'inactive', minRequired: MIN_AMOUNT_INACTIVE };
     }
     return { valid: true };
   }
@@ -149,8 +148,6 @@ export function getValidationMessage(result) {
   const gap = result.gap != null ? Math.ceil(result.gap) : 0;
   const gapStr = gap.toLocaleString('es-DO');
   switch (result.type) {
-    case 'blocked':
-      return 'Tu cuenta esta bloqueada. Contacta a soporte tecnico.';
     case 'disabled':
       return 'Tu cuenta esta deshabilitada. Contacta a soporte para mas informacion.';
     case 'missing_kit':
@@ -162,7 +159,7 @@ export function getValidationMessage(result) {
     case 'penalized':
       return `Para reactivar tu cuenta, pedido minimo RD$ 20,000. Faltan RD$ ${gapStr}.`;
     case 'inactive':
-      return `Tu cuenta esta inactiva. Para reactivarla necesitas una compra minima de RD$20,000. Faltan RD$ ${gapStr}.`;
+      return `Tu cuenta esta inactiva. Para reactivarla necesitas una compra minima de RD$20,000 en productos (sin incluir envio). Faltan RD$ ${gapStr}.`;
     default:
       return 'Tu carrito no cumple con los requisitos minimos.';
   }

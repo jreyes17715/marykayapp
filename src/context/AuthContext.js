@@ -7,6 +7,7 @@ import {
   findCustomerByEmail,
   getOrdersByCustomer,
   updateCustomer,
+  getAccountStatus,
 } from '../api/woocommerce';
 import { CONSULTANT_STATES } from '../constants/cartRules';
 import {
@@ -55,23 +56,27 @@ async function buildUserFromToken(token, initialEmail) {
     const freeShippingUntil = getUserMeta(metaData, '_free_shipping_until') || null;
 
     const consultantStateRaw = getUserMeta(metaData, 'consultant_state') || null;
-    const blockedAt = getUserMeta(metaData, 'blocked_at') || null;
     const rewardAvailable = parseBool(getUserMeta(metaData, 'reward_available'));
     const rewardRedeemed = parseBool(getUserMeta(metaData, 'reward_redeemed'));
     const lastActivePurchaseTs = getUserMeta(metaData, '_kit_last_active_purchase_ts') || null;
-    const kitActivaConfirmada = getUserMeta(metaData, '_kit_activa_confirmada');
 
     const resolvedConsultantState =
       consultantStateRaw ||
       getConsultantState({ hasBoughtKit: parseBool(getUserMeta(metaData, 'has_bought_kit')) });
 
-    // _kit_activa_confirmada es la fuente de verdad del backend para inactividad.
-    // Para usuarios ACTIVE: solo '1' o 'yes' confirman actividad.
-    // Cualquier otro valor (null, '0', '', 'no', 'false') = INACTIVE.
+    // Consultar endpoint /kit/v1/status/{userId} para saber si la cuenta esta deshabilitada
+    let accountDisabled = false;
+    try {
+      const statusResult = await getAccountStatus(wpUser.id);
+      if (statusResult.success) {
+        accountDisabled = statusResult.accountDisabled;
+      }
+    } catch (e) {
+      // Si falla el endpoint, asumir cuenta activa para no bloquear al usuario
+    }
+
     const effectiveConsultantState =
-      (resolvedConsultantState === CONSULTANT_STATES.ACTIVE && kitActivaConfirmada !== '1' && kitActivaConfirmada !== 'yes')
-        ? CONSULTANT_STATES.INACTIVE
-        : resolvedConsultantState;
+      accountDisabled ? CONSULTANT_STATES.INACTIVE : resolvedConsultantState;
 
     const user = {
       id: wpUser.id,
@@ -103,16 +108,14 @@ async function buildUserFromToken(token, initialEmail) {
       freeShippingUntil,
       hasFreeShipping: freeShippingUntil != null && new Date(freeShippingUntil) > new Date(),
       consultantState: effectiveConsultantState,
-      blockedAt,
+      accountDisabled,
       rewardAvailable,
       rewardRedeemed,
       isDisabled: effectiveConsultantState === CONSULTANT_STATES.DISABLED,
       lastActivePurchaseTs,
-      isBlocked: false,
       restrictionState: null,
     };
     user.restrictionState = resolveRestrictionState(user);
-    user.isBlocked = user.restrictionState === CONSULTANT_STATES.BLOCKED;
     return { success: true, user };
   }
 
@@ -144,12 +147,11 @@ async function buildUserFromToken(token, initialEmail) {
     freeShippingUntil: null,
     hasFreeShipping: false,
     consultantState: CONSULTANT_STATES.NEW,
-    blockedAt: null,
+    accountDisabled: false,
     rewardAvailable: false,
     rewardRedeemed: false,
     isDisabled: false,
     lastActivePurchaseTs: null,
-    isBlocked: false,
     restrictionState: null,
   };
   return { success: true, user };
@@ -194,7 +196,7 @@ export function AuthProvider({ children }) {
       const metaUpdates = [];
       let newState = currentUser.consultantState;
 
-      // Inactividad se maneja por backend via _kit_activa_confirmada — no recalcular en frontend
+      // Inactividad se maneja por backend via endpoint /kit/v1/status — no recalcular en frontend
 
       // Evaluar elegibilidad de reward (usa trimestre actual)
       const currentQuarter = getQuarterBounds();
@@ -208,7 +210,6 @@ export function AuthProvider({ children }) {
       if (metaUpdates.length > 0) {
         await updateCustomer(currentUser.customerId, { meta_data: metaUpdates });
 
-        // Actualizar estado local — re-run resolveRestrictionState to preserve BLOCKED priority
         setUser((prev) => {
           if (!prev) return prev;
           const updated = {
@@ -217,7 +218,6 @@ export function AuthProvider({ children }) {
             rewardAvailable: metaUpdates.some((m) => m.key === 'reward_available') ? true : prev.rewardAvailable,
           };
           updated.restrictionState = resolveRestrictionState(updated);
-          updated.isBlocked = updated.restrictionState === CONSULTANT_STATES.BLOCKED;
           return updated;
         });
       }
@@ -240,10 +240,8 @@ export function AuthProvider({ children }) {
       throw new Error(buildResult.error);
     }
 
-    // Bloquear login si la cuenta esta deshabilitada
-    if (buildResult.user.isDisabled) {
-      throw new Error('ACCOUNT_DISABLED');
-    }
+    // Nota: ya no bloqueamos login. Cuentas deshabilitadas (accountDisabled=true)
+    // entran como INACTIVE y ven el banner con requisito de 20k para reactivar.
 
     await persistToken(token);
     setUser(buildResult.user);
@@ -276,7 +274,6 @@ export function AuthProvider({ children }) {
             fresh.consultantState = CONSULTANT_STATES.ACTIVE;
           }
           fresh.restrictionState = resolveRestrictionState(fresh);
-          fresh.isBlocked = fresh.restrictionState === CONSULTANT_STATES.BLOCKED;
         }
         return fresh;
       });
@@ -305,7 +302,7 @@ export function AuthProvider({ children }) {
           try {
             const buildResult = await buildUserFromToken(token);
             if (cancelled) return;
-            if (buildResult.success && !buildResult.user.isDisabled) {
+            if (buildResult.success) {
               setUser(buildResult.user);
               // Evaluar trimestral en background para usuarios ACTIVE e INACTIVE
               if (buildResult.user.consultantState === CONSULTANT_STATES.ACTIVE ||

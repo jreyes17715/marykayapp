@@ -334,6 +334,23 @@ export function createCustomer(customerData) {
   return request(() => woocommerce.post('/customers', customerData));
 }
 
+// ——— Kit Status (cuenta activa/inactiva) ———
+
+/**
+ * Consulta el estado de la cuenta de una consultora.
+ * GET /wp-json/kit/v1/status/{userId} — endpoint público, sin auth.
+ * @param {number|string} userId - WordPress user ID
+ * @returns {Promise<{ success: boolean, accountDisabled?: boolean, error?: string }>}
+ */
+export async function getAccountStatus(userId) {
+  try {
+    const { data } = await wpRest.get(`/kit/v1/status/${userId}`);
+    return { success: true, accountDisabled: !!data.account_disabled };
+  } catch (err) {
+    return { success: false, error: getErrorMessage(err) };
+  }
+}
+
 // ——— Helpers ———
 
 const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/300x300?text=Sin+imagen';

@@ -86,9 +86,10 @@ export default function CartScreen() {
   const validationMessage = getValidationMessage(validation);
   const minRequired = validation.minRequired ?? getMinRequiredForUser(user);
   const showProgress = user && minRequired != null && minRequired > 0 && cartItems.length > 0;
-  // INACTIVE y ACTIVE usan solo productos con descuento (seccion 2) para el minimo
+  // ACTIVE usa solo productos con descuento (seccion 2) para el minimo
+  // INACTIVE usa total de todos los productos (sin envio)
   const totalParaProgreso = useMemo(() => {
-    if (user?.restrictionState === 'inactive') return calcularTotalSeccion2(cartItems, user);
+    if (user?.restrictionState === 'inactive') return totalConDescuento;
     const state = user?.consultantState;
     if (state === 'active') return calcularTotalSeccion2(cartItems, user);
     return totalConDescuento;
@@ -426,31 +427,31 @@ export default function CartScreen() {
         }
       />
 
-      {showProgress && (
-        <View style={[styles.progressWrap, { bottom: bottomHeight + 16 }]}>
-          <View style={styles.progressBarBg}>
-            <View
-              style={[
-                styles.progressBarFill,
-                {
-                  width: `${progressPct}%`,
-                  backgroundColor: progressReached ? PROGRESS_OK : PROGRESS_FILL,
-                },
-              ]}
-            />
-          </View>
-          <Text style={styles.progressText}>
-            {progressReached
-              ? '✓ Mínimo alcanzado'
-              : `RD$ ${totalParaProgreso.toLocaleString('es-DO', { minimumFractionDigits: 2 })} de RD$ ${minRequired.toLocaleString('es-DO')} mínimo`}
-          </Text>
-        </View>
-      )}
-
       <View
         style={[styles.fixedBottom, { paddingBottom: Math.max(24, insets.bottom) }]}
         onLayout={(e) => setBottomHeight(e.nativeEvent.layout.height)}
       >
+        {showProgress && (
+          <View style={styles.progressWrap}>
+            <View style={styles.progressBarBg}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  {
+                    width: `${progressPct}%`,
+                    backgroundColor: progressReached ? PROGRESS_OK : PROGRESS_FILL,
+                  },
+                ]}
+              />
+            </View>
+            <Text style={styles.progressText}>
+              {progressReached
+                ? '✓ Mínimo alcanzado'
+                : `RD$ ${totalParaProgreso.toLocaleString('es-DO', { minimumFractionDigits: 2 })} de RD$ ${minRequired.toLocaleString('es-DO')} mínimo`}
+            </Text>
+          </View>
+        )}
+
         <OrderSummaryCard
           subtotalOriginal={subtotalOriginal}
           totalConDescuento={totalConDescuento}
@@ -530,9 +531,7 @@ const styles = StyleSheet.create({
     color: BANNER_TEXT,
   },
   progressWrap: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
+    marginBottom: 12,
   },
   progressBarBg: {
     height: 8,
@@ -676,6 +675,7 @@ const styles = StyleSheet.create({
   itemInfo: {
     flex: 1,
     marginLeft: 12,
+    paddingRight: 24,
   },
   itemName: {
     fontSize: 15,

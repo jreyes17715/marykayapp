@@ -36,7 +36,7 @@
 - **Desde:** 2026-03-31
 
 ### RULE-006: Evaluacion de Inactividad via Backend Flag
-- **Descripción:** La inactividad la determina el plugin WordPress `kit-restrictor.php` via la flag `_kit_activa_confirmada`. El frontend lee esta flag y NO recalcula usando meses o historial. `'1'/'yes'` = activa, `'0'/'no'/''` = inactiva, `null` = backward compat (confiar en consultant_state). Las funciones `isInactive()` y `shouldMarkInactive()` son dead code.
+- **Descripción:** La inactividad la determina el plugin WordPress `kit-restrictor.php` via la flag `_kit_activa_confirmada`. El frontend lee esta flag y NO recalcula usando meses o historial. Solo `'1'`/`'yes'` = activa. **Todo lo demas (null, '0', '', missing) = INACTIVE.** Null NO es backward compat. Las funciones `isInactive()` y `shouldMarkInactive()` son dead code.
 - **Razón:** El backend es la fuente de verdad. Evita drift entre frontend y backend.
 - **Nota:** PENALIZED sigue existiendo como estado legacy. `evaluateQuarterlyStatus` ya no escribe INACTIVE a WooCommerce.
 - **Desde:** 2026-03-31 (backend flag como fuente de verdad desde 2026-04-13)
