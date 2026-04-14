@@ -45,6 +45,10 @@ Stack: React Native (Expo 54) + JavaScript (sin TypeScript) + WooCommerce API + 
   - Endpoints: `/jwt-auth/v1/token`, `/jwt-auth/v1/token/validate`
 - **FLAI**: Sistema externo de inventario (actualmente bypassed con FLAI_BYPASS=true)
   - Base: `https://cel.flai.com.do`
+- **Kit Validator API**: Validacion de estado de cuenta (activa/inactiva/inhabilitada)
+  - Base: `https://aromadelrosalinvestments.com/wp-json/kit/v1`
+  - Auth: Ninguna (endpoint publico)
+  - Endpoint: `GET /status/{user_id}` → `{ account_disabled, needs_reactivation }`
 
 ### Reglas de Negocio Criticas
 - **Descuentos**: Se calculan en `src/utils/discounts.js`. Hay 3 niveles:
@@ -58,6 +62,8 @@ Stack: React Native (Expo 54) + JavaScript (sin TypeScript) + WooCommerce API + 
   - `ACTIVE`: activa. Minimo: RD$1,000 (solo productos seccion 2)
   - `PENALIZED`: no alcanzo RD$20,000 en trimestre. Minimo: RD$20,000
   - `DISABLED`: inhabilitada. No puede comprar.
+  - `BLOCKED`: inhabilitada por admin. Determinado por `account_disabled: true` del endpoint `/kit/v1/status/{user_id}`. No puede operar la app.
+  - `INACTIVE`: sin compra calificada. Determinado por `needs_reactivation: true` del endpoint `/kit/v1/status/{user_id}`. Minimo RD$20,000 en productos con descuento.
   - Admin/Staff: sin minimo
 - **Minimos de carrito** (en `src/constants/cartRules.js`):
   - NEW: Kit (ID 4994) + RD$20,000 en productos
@@ -87,6 +93,7 @@ Stack: React Native (Expo 54) + JavaScript (sin TypeScript) + WooCommerce API + 
 - La evaluacion trimestral de penalizacion/reward se ejecuta al login (no hay cron)
 - Los tests en __tests__/ referencian constantes viejas y necesitan actualizarse
 - No hay tests unitarios ni de integracion
+- La validacion de cuenta activa/inactiva/inhabilitada usa endpoint publico /kit/v1/status/{user_id} (no metas de WP)
 
 ### Comandos
 ```bash

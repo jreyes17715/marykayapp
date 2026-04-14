@@ -1,7 +1,7 @@
 # Errores Conocidos y Fixes
 > LEE ESTE ARCHIVO ANTES DE IMPLEMENTAR. Evita repetir errores.
 > Aplica a TODOS los agentes, no solo al implementador.
-> Última actualización: 2026-04-13
+> Última actualización: 2026-04-14
 
 ## ERROR-001: babel-preset-expo no disponible
 - **Síntoma:** Build falla buscando babel-preset-expo
@@ -49,7 +49,7 @@
 - **Fix:** Pre-aplicar shouldMarkInactive antes de resolveRestrictionState en buildUserFromToken
 - **Módulos afectados:** AuthContext.js
 - **Ocurrencias:** 1 (commit e02fe78)
-- **Status:** Corregido (parcial — ver ERROR-008)
+- **Status:** Corregido (parcial — ver ERROR-008) — Legacy — funciones eliminadas 2026-04-14, validacion ahora via endpoint
 
 ## ERROR-008: resolveRestrictionState re-valida INACTIVE innecesariamente
 - **Síntoma:** Usuario con consultantState='inactive' ve minimo 1,000 (ACTIVE) en vez de 20,000
@@ -57,7 +57,7 @@
 - **Fix:** Confiar en state INACTIVE directamente. Solo llamar isInactive() para ACTIVE.
 - **Módulos afectados:** consultantState.js
 - **Ocurrencias:** 1 (commit 687adc7)
-- **Status:** Corregido
+- **Status:** Corregido — Legacy — funciones eliminadas 2026-04-14, validacion ahora via endpoint
 
 ## ERROR-009: hasBoughtKit revierte a false tras refreshUserData
 - **Síntoma:** Perfil muestra "kit comprado", usuario compra, perfil cambia a "kit pendiente"
@@ -81,7 +81,7 @@
 - **Fix:** Detectar substring 'deactiv' en errMsg y mostrar Alert de Cuenta Bloqueada con email soporte
 - **Módulos afectados:** LoginScreen.js
 - **Ocurrencias:** 1 (commit faf9942, fix 2f92cf7)
-- **Status:** Corregido
+- **Status:** Corregido — Fix actualizado 2026-04-14: muestra Alert con titulo "Cuenta Inhabilitada" y email soporte@aromadelrosal.com con estilos Mary Kay
 
 ## ERROR-002: worklets-core conflicto con reanimated 4.x
 - **Síntoma:** Build Android falla por conflicto de paquetes
