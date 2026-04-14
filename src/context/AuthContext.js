@@ -263,8 +263,9 @@ export function AuthProvider({ children }) {
       throw new Error(buildResult.error);
     }
 
-    // Nota: ya no bloqueamos login. Cuentas deshabilitadas (accountDisabled=true)
-    // entran como INACTIVE y ven el banner con requisito de 20k para reactivar.
+    // Ya no bloqueamos login aqui. Cuentas con account_disabled=true entran
+    // y AppNavigator las redirige a BlockedScreen. Cuentas con needs_reactivation=true
+    // entran como INACTIVE y ven el banner + minimo de 20k.
 
     await persistToken(token);
     setUser(buildResult.user);
