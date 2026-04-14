@@ -344,7 +344,9 @@ export function createCustomer(customerData) {
  */
 export async function getAccountStatus(userId) {
   try {
-    const { data } = await wpRest.get(`/kit/v1/status/${userId}`);
+    const { data } = await wpRest.get(`/kit/v1/status/${userId}`, {
+      params: { _t: Date.now() },
+    });
     return {
       success: true,
       accountDisabled: !!data.account_disabled,
