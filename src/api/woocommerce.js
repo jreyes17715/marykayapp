@@ -348,7 +348,7 @@ export async function getAccountStatus(userId) {
     return {
       success: true,
       accountDisabled: !!data.account_disabled,
-      needReactivation: !!data.need_reactivation,
+      needReactivation: !!data.needs_reactivation,
     };
   } catch (err) {
     return { success: false, error: getErrorMessage(err) };
