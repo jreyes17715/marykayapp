@@ -7,6 +7,7 @@ export const CONSULTANT_STATES = {
   ACTIVE: 'active',
   PENALIZED: 'penalized',
   DISABLED: 'disabled',
+  BLOCKED: 'blocked',
   INACTIVE: 'inactive',
 };
 

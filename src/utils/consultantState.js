@@ -30,14 +30,18 @@ export function getUserMeta(metaData, key) {
 
 /**
  * Evalua si la consultora tiene una restriccion de compra activa.
- * Usa el campo accountDisabled (seteado via endpoint /kit/v1/status/{userId}).
- * accountDisabled === true → INACTIVE. false → null (sin restriccion).
+ * Usa los campos del endpoint /kit/v1/status/{userId}:
+ *   account_disabled → BLOCKED (prioridad maxima, no puede operar)
+ *   need_reactivation → INACTIVE (puede comprar con minimo 20k seccion 2)
  *
- * @param {object} user - Objeto de usuario con campo accountDisabled
- * @returns {'inactive'|null}
+ * @param {object} user - Objeto de usuario con campos accountDisabled y needReactivation
+ * @returns {'blocked'|'inactive'|null}
  */
 export function resolveRestrictionState(user) {
   if (user.accountDisabled) {
+    return CONSULTANT_STATES.BLOCKED;
+  }
+  if (user.needReactivation) {
     return CONSULTANT_STATES.INACTIVE;
   }
   return null;
@@ -274,6 +278,8 @@ export function getMinimumForState(state) {
     case CONSULTANT_STATES.INACTIVE:
       return MIN_AMOUNT_INACTIVE;
     case CONSULTANT_STATES.DISABLED:
+      return null;
+    case CONSULTANT_STATES.BLOCKED:
       return null;
     default:
       return null;

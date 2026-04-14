@@ -86,10 +86,9 @@ export default function CartScreen() {
   const validationMessage = getValidationMessage(validation);
   const minRequired = validation.minRequired ?? getMinRequiredForUser(user);
   const showProgress = user && minRequired != null && minRequired > 0 && cartItems.length > 0;
-  // ACTIVE usa solo productos con descuento (seccion 2) para el minimo
-  // INACTIVE usa total de todos los productos (sin envio)
+  // INACTIVE y ACTIVE usan solo productos con descuento (seccion 2) para el minimo
   const totalParaProgreso = useMemo(() => {
-    if (user?.restrictionState === 'inactive') return totalConDescuento;
+    if (user?.restrictionState === 'inactive') return calcularTotalSeccion2(cartItems, user);
     const state = user?.consultantState;
     if (state === 'active') return calcularTotalSeccion2(cartItems, user);
     return totalConDescuento;

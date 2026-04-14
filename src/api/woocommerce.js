@@ -340,12 +340,16 @@ export function createCustomer(customerData) {
  * Consulta el estado de la cuenta de una consultora.
  * GET /wp-json/kit/v1/status/{userId} — endpoint público, sin auth.
  * @param {number|string} userId - WordPress user ID
- * @returns {Promise<{ success: boolean, accountDisabled?: boolean, error?: string }>}
+ * @returns {Promise<{ success: boolean, accountDisabled?: boolean, needReactivation?: boolean, error?: string }>}
  */
 export async function getAccountStatus(userId) {
   try {
     const { data } = await wpRest.get(`/kit/v1/status/${userId}`);
-    return { success: true, accountDisabled: !!data.account_disabled };
+    return {
+      success: true,
+      accountDisabled: !!data.account_disabled,
+      needReactivation: !!data.need_reactivation,
+    };
   } catch (err) {
     return { success: false, error: getErrorMessage(err) };
   }

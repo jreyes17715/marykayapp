@@ -64,19 +64,21 @@ async function buildUserFromToken(token, initialEmail) {
       consultantStateRaw ||
       getConsultantState({ hasBoughtKit: parseBool(getUserMeta(metaData, 'has_bought_kit')) });
 
-    // Consultar endpoint /kit/v1/status/{userId} para saber si la cuenta esta deshabilitada
+    // Consultar endpoint /kit/v1/status/{userId} para estado de cuenta
     let accountDisabled = false;
+    let needReactivation = false;
     try {
       const statusResult = await getAccountStatus(wpUser.id);
       if (statusResult.success) {
         accountDisabled = statusResult.accountDisabled;
+        needReactivation = statusResult.needReactivation;
       }
     } catch (e) {
       // Si falla el endpoint, asumir cuenta activa para no bloquear al usuario
     }
 
     const effectiveConsultantState =
-      accountDisabled ? CONSULTANT_STATES.INACTIVE : resolvedConsultantState;
+      needReactivation ? CONSULTANT_STATES.INACTIVE : resolvedConsultantState;
 
     const user = {
       id: wpUser.id,
@@ -109,6 +111,7 @@ async function buildUserFromToken(token, initialEmail) {
       hasFreeShipping: freeShippingUntil != null && new Date(freeShippingUntil) > new Date(),
       consultantState: effectiveConsultantState,
       accountDisabled,
+      needReactivation,
       rewardAvailable,
       rewardRedeemed,
       isDisabled: effectiveConsultantState === CONSULTANT_STATES.DISABLED,
@@ -148,6 +151,7 @@ async function buildUserFromToken(token, initialEmail) {
     hasFreeShipping: false,
     consultantState: CONSULTANT_STATES.NEW,
     accountDisabled: false,
+    needReactivation: false,
     rewardAvailable: false,
     rewardRedeemed: false,
     isDisabled: false,

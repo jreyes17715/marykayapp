@@ -29,7 +29,6 @@ function getLoginErrorMessage(error) {
   if (msg.toLowerCase().includes('incorrecta') || msg.toLowerCase().includes('incorrect')) return ERROR_MESSAGES.CREDENTIALS;
   if (msg.toLowerCase().includes('red') || msg.toLowerCase().includes('network') || msg.toLowerCase().includes('conexión') || msg.toLowerCase().includes('timeout')) return ERROR_MESSAGES.NETWORK;
   if (msg.includes('500') || msg.toLowerCase().includes('servidor')) return ERROR_MESSAGES.SERVER;
-  if (msg.toLowerCase().includes('deactiv')) return 'Tu cuenta esta temporalmente inactiva. Contacta a soporte si el problema persiste.';
   return msg || ERROR_MESSAGES.GENERIC;
 }
 
@@ -54,7 +53,16 @@ export default function LoginScreen() {
       await login(user, password);
       // Al cambiar isLoggedIn, AppNavigator muestra MainTabs automáticamente
     } catch (e) {
-      setError(getLoginErrorMessage(e));
+      const errMsg = e?.message || '';
+      if (errMsg.toLowerCase().includes('deactiv')) {
+        Alert.alert(
+          'Cuenta Inhabilitada',
+          'Tu cuenta ha sido inhabilitada. Para mas informacion contacta a soporte tecnico:\n\nsoporte@aromadelrosal.com',
+          [{ text: 'Entendido' }]
+        );
+      } else {
+        setError(getLoginErrorMessage(e));
+      }
     } finally {
       setLoading(false);
     }

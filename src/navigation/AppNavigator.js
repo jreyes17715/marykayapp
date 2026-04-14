@@ -15,6 +15,7 @@ import CheckoutScreen from '../screens/CheckoutScreen';
 import LoginScreen from '../screens/LoginScreen';
 import ConsultantListScreen from '../screens/ConsultantListScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import BlockedScreen from '../screens/BlockedScreen';
 import LoadingSpinner from '../components/LoadingSpinner';
 import InactiveUserBanner from '../components/InactiveUserBanner';
 import { CartContext } from '../context/CartContext';
@@ -275,6 +276,10 @@ export default function AppNavigator() {
 
   if (isLoading) {
     return <LoadingSpinner message="Cargando..." />;
+  }
+
+  if (isLoggedIn && user?.restrictionState === 'blocked') {
+    return <BlockedScreen />;
   }
 
   return (

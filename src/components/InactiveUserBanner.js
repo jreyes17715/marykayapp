@@ -12,7 +12,7 @@ export default function InactiveUserBanner() {
   return (
     <View style={styles.banner}>
       <Text style={styles.text}>
-        Tu cuenta está inactiva. Para reactivarla necesitas un pedido mínimo de RD$ 20,000 en productos.
+        Tu cuenta está inactiva. Para reactivarla necesitas un pedido mínimo de RD$ 20,000 en productos con descuento.
       </Text>
     </View>
   );

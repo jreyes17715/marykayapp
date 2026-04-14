@@ -11,32 +11,39 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 
+const SUPPORT_EMAIL = 'soporte@aromadelrosal.com';
+
 export default function BlockedScreen() {
   const { logout } = useAuth();
 
   function handleContactarSoporte() {
-    Linking.openURL('mailto:atencionalcliente@aromadelrosal.com').catch(() => {
-      Alert.alert('Correo de soporte', 'atencionalcliente@aromadelrosal.com');
+    Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => {
+      Alert.alert('Correo de soporte', SUPPORT_EMAIL);
     });
   }
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Feather name="lock" size={80} color="#d11e51" style={styles.icon} />
+        <View style={styles.iconCircle}>
+          <Feather name="alert-circle" size={48} color="#ffffff" />
+        </View>
 
-        <Text style={styles.title}>Cuenta Bloqueada</Text>
+        <Text style={styles.title}>Cuenta Inhabilitada</Text>
 
         <Text style={styles.message}>
-          Tu cuenta ha sido desactivada. Para mas informacion, contacta a soporte tecnico:{'\n\n'}atencionalcliente@aromadelrosal.com
+          Tu cuenta ha sido inhabilitada. Para mas informacion, contacta a soporte tecnico:
         </Text>
+
+        <Text style={styles.email}>{SUPPORT_EMAIL}</Text>
 
         <TouchableOpacity
           style={styles.buttonPrimary}
           onPress={handleContactarSoporte}
           activeOpacity={0.8}
         >
-          <Text style={styles.buttonPrimaryText}>Enviar Correo a Soporte</Text>
+          <Feather name="mail" size={18} color="#ffffff" style={styles.btnIcon} />
+          <Text style={styles.buttonPrimaryText}>Contactar Soporte</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -62,14 +69,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 32,
   },
-  icon: {
+  iconCircle: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: '#d11e51',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 24,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1a1a2e',
-    marginBottom: 16,
+    color: '#d11e51',
+    marginBottom: 12,
     textAlign: 'center',
   },
   message: {
@@ -77,7 +90,14 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: 40,
+    marginBottom: 8,
+  },
+  email: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#d11e51',
+    textAlign: 'center',
+    marginBottom: 32,
   },
   buttonPrimary: {
     backgroundColor: '#d11e51',
@@ -85,7 +105,12 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     width: '100%',
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
     marginBottom: 12,
+  },
+  btnIcon: {
+    marginRight: 8,
   },
   buttonPrimaryText: {
     color: '#ffffff',
