@@ -1,6 +1,6 @@
 # Registro de Componentes — UI-UX
 > LEE ANTES DE CREAR UN COMPONENTE. Verifica si ya existe o hay uno similar.
-> Última actualización: 2026-03-25
+> Última actualización: 2026-04-21
 
 ## Design Tokens
 ### Colores
@@ -19,6 +19,9 @@
 | CategoryGridCard | default, loading (skeleton) | HomeScreen via CategoryGrid | White card, #FDF1F5 icon circle, Feather icon 26pt, borderRadius 12, shadow from theme |
 | CategoryGrid | default, loading | HomeScreen | 2-col flexWrap grid, gap 12, resolves Feather icons by slug/name |
 | InactiveUserBanner | visible (restrictionState==='inactive'), hidden (returns null) | AppNavigator (global) | Fondo #f59e0b, texto blanco bold centrado, no-dismissible, auto-oculta cuando restrictionState cambia |
+| OrderSummaryCard | default (expanded), collapsible | CartScreen (collapsible), CheckoutScreen (default) | Props: `collapsible`, `collapsed`, `onToggleCollapsed`, `defaultCollapsed`. Modo colapsado: solo Total + count + "Ver más ▾". Expandido: desglose completo + "Ver menos ▴". Usa LayoutAnimation.easeInEaseOut. Opt-in: Checkout no pasa `collapsible` y mantiene comportamiento previo. |
+| CartScreen InlineHeader | con back (canGoBack=true), sin back (tab directo) | CartScreen | Header compacto custom (reemplaza stack header "Mary Kay"). Alturas: paddingTop = max(8, insets.top). Estructura: [← back | "Mi Carrito"] ... [Vaciar carrito]. Placeholder 32x32 cuando no hay goBack para mantener alineación. |
+| HeaderIconButton (pattern) | default 44x44 | AppNavigator HomeStack (bell con badge) | Patrón inline (no componente extraído aún): TouchableOpacity 44x44 centrado, sin fondo, hitSlop 8. Badge 18x18 con border blanco 1.5px y `top:6 right:6`. Replicable para otros íconos de header. |
 
 ## Decisiones de UI
 

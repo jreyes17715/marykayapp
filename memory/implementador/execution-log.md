@@ -2,6 +2,26 @@
 > Escribir una entrada después de CADA implementación.
 > Este log se consolida semanalmente para extraer patrones nuevos.
 
+## 2026-04-21 — Cart UX: OrderSummaryCard colapsable + header inline compacto
+- Tarea: Resumen del carrito tapaba la lista cuando el mínimo no se cumplía. También recuperar espacio del header "Mary Kay".
+- Resultado: aprobado (validado visualmente por Abraham)
+- Commits: 903f6db (rebaseado a ab90fc2)
+- Archivos: src/components/OrderSummaryCard.js, src/screens/CartScreen.js, src/navigation/AppNavigator.js
+- Aprendizaje:
+  - `OrderSummaryCard` ahora acepta props opt-in (`collapsible`, `collapsed`, `onToggleCollapsed`, `defaultCollapsed`). Checkout no las pasa y queda igual — evita romper consumidores existentes.
+  - En CartScreen: `useEffect([isValid]) → setSummaryCollapsed(!isValid)` auto-colapsa cuando validación falla, pero permite override manual del usuario.
+  - Barra de progreso DEBE quedar fuera del card cuando es colapsable (siempre visible para feedback del mínimo).
+  - `headerShown: false` en Cart + header inline custom con safe area (`paddingTop: max(8, insets.top)`) para recuperar ~56px verticales.
+  - Añadido botón back con `navigation.canGoBack()` — si false, renderiza View placeholder 32x32 para conservar alineación.
+
+## 2026-04-21 — Fix botón notificaciones Home header
+- Tarea: Botón bell del HomeStack tenía tap target pequeño (30px) y badge descentrado.
+- Resultado: aprobado (validado visualmente)
+- Commit: 512d650
+- Archivo: src/navigation/AppNavigator.js
+- Aprendizaje: Patrón para íconos de header = `44x44` centrado sin fondo, hitSlop 8, badge 18x18 con `borderWidth: 1.5` + `borderColor: white` para separación visual. Estilos al StyleSheet (no inline). Replicable para futuros íconos de header.
+
+
 ## 2026-04-13 — InactiveUserBanner: componente global de aviso para estado INACTIVE
 - Tarea: Crear src/components/InactiveUserBanner.js y modificar AppNavigator.js para mostrarlo globalmente cuando user.restrictionState === 'inactive'
 - Resultado: aprobado
