@@ -98,37 +98,16 @@ function HomeStack() {
           headerRight: () => (
             <TouchableOpacity
               onPress={() => navigation.navigate('Notifications')}
-              style={{ marginRight: 16 }}
-              activeOpacity={0.8}
+              style={styles.headerIconButton}
+              activeOpacity={0.6}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <View style={{ padding: 4 }}>
-                <Feather name="bell" size={22} color={colors.secondary} />
-                {unreadCount > 0 && (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: -2,
-                      right: -4,
-                      backgroundColor: colors.primary,
-                      borderRadius: 10,
-                      width: 18,
-                      height: 18,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: colors.white,
-                        fontSize: 10,
-                        fontWeight: 'bold',
-                      }}
-                    >
-                      {unreadCount}
-                    </Text>
-                  </View>
-                )}
-              </View>
+              <Feather name="bell" size={22} color={colors.secondary} />
+              {unreadCount > 0 && (
+                <View style={styles.headerBadge}>
+                  <Text style={styles.headerBadgeText}>{unreadCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           ),
         })}
@@ -321,5 +300,32 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 11,
     fontWeight: 'bold',
+  },
+  headerIconButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  headerBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: colors.white,
+  },
+  headerBadgeText: {
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: 'bold',
+    lineHeight: 12,
   },
 });
