@@ -158,7 +158,11 @@ function StoreStack() {
 function CartStack() {
   return (
     <Stack.Navigator screenOptions={headerOptions}>
-      <Stack.Screen name="Cart" component={CartScreen} />
+      <Stack.Screen
+        name="Cart"
+        component={CartScreen}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen name="Checkout" component={CheckoutScreen} />
     </Stack.Navigator>
   );

@@ -1,26 +1,30 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  LayoutAnimation,
+  Platform,
+  UIManager,
+} from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { formatPrice } from '../api/woocommerce';
 import colors from '../constants/colors';
 import theme from '../constants/theme';
 
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 /**
- * Resumen de pedido agrupado en secciones:
- *  - Sección 1: Productos con descuento (total original, descuento, neto al por mayor)
- *  - Sección 2: Productos sin descuento (precio neto)
- *  - Envío
- *  - Total final
+ * Resumen de pedido.
  *
- * Props:
- *  - subtotalOriginal: number
- *  - totalConDescuento: number
- *  - discountNivel: { porcentaje, monto } | null
- *  - discountEspeciales: [{ porcentaje, monto }]
- *  - totalNetos: number
- *  - shipping: { cost, isFree, label }
- *  - shippingCost: number
- *  - totalItems: number
- *  - showFreeShippingHint: boolean (optional)
+ * Props nuevas (opcionales, opt-in):
+ *  - collapsible: boolean           -> habilita modo plegable
+ *  - collapsed: boolean             -> estado controlado (opcional)
+ *  - onToggleCollapsed: () => void  -> callback al togglear (opcional)
+ *  - defaultCollapsed: boolean      -> estado inicial si no es controlado
  */
 export default function OrderSummaryCard({
   subtotalOriginal,
@@ -32,7 +36,25 @@ export default function OrderSummaryCard({
   shippingCost,
   totalItems,
   showFreeShippingHint = false,
+  collapsible = false,
+  collapsed,
+  onToggleCollapsed,
+  defaultCollapsed = false,
 }) {
+  const [internalCollapsed, setInternalCollapsed] = React.useState(defaultCollapsed);
+  const isControlled = typeof collapsed === 'boolean';
+  const isCollapsed = collapsible && (isControlled ? collapsed : internalCollapsed);
+
+  const handleToggle = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (isControlled) {
+      onToggleCollapsed?.();
+    } else {
+      setInternalCollapsed((v) => !v);
+      onToggleCollapsed?.();
+    }
+  };
+
   const totalDescuentoNivel = discountNivel?.monto || 0;
   const totalDescuentoEspeciales = (discountEspeciales || []).reduce(
     (sum, d) => sum + d.monto,
@@ -40,23 +62,50 @@ export default function OrderSummaryCard({
   );
   const totalDescuento = totalDescuentoNivel + totalDescuentoEspeciales;
 
-  // Sección 1: productos CON descuento
   const totalOriginalConDescuento = subtotalOriginal - totalNetos;
   const totalNetoAlPorMayor = totalConDescuento - totalNetos;
 
-  // Porcentaje para el label
   const hasSeccion1 = totalOriginalConDescuento > 0 && totalDescuento > 0;
   const nivelPct = discountNivel?.porcentaje
     || (totalOriginalConDescuento > 0
       ? Math.round((totalDescuento / totalOriginalConDescuento) * 100)
       : 0);
 
-  // Total final
   const totalFinal = totalConDescuento + shippingCost;
 
+  const Wrapper = collapsible ? TouchableOpacity : View;
+  const wrapperProps = collapsible
+    ? { activeOpacity: 0.85, onPress: handleToggle }
+    : {};
+
+  if (collapsible && isCollapsed) {
+    return (
+      <Wrapper style={styles.card} {...wrapperProps}>
+        <View style={styles.collapsedHeader}>
+          <View style={styles.collapsedTextWrap}>
+            <Text style={styles.collapsedLabel}>Total a Pagar</Text>
+            {totalItems > 0 && (
+              <Text style={styles.collapsedItems}>
+                {totalItems} {totalItems === 1 ? 'producto' : 'productos'}
+              </Text>
+            )}
+          </View>
+          <View style={styles.collapsedRight}>
+            <Text style={styles.collapsedTotal}>
+              {formatPrice(totalFinal.toFixed(2))}
+            </Text>
+            <View style={styles.seeMoreRow}>
+              <Text style={styles.seeMoreText}>Ver más</Text>
+              <Feather name="chevron-down" size={14} color={colors.primary} />
+            </View>
+          </View>
+        </View>
+      </Wrapper>
+    );
+  }
+
   return (
-    <View style={styles.card}>
-      {/* Sección 1: Productos con descuento */}
+    <Wrapper style={styles.card} {...wrapperProps}>
       {hasSeccion1 && (
         <>
           <View style={styles.row}>
@@ -88,7 +137,6 @@ export default function OrderSummaryCard({
         </>
       )}
 
-      {/* Sección 2: Productos sin descuento */}
       {totalNetos > 0 && (
         <View style={styles.row}>
           <Text style={styles.seccion2Label}>
@@ -100,7 +148,6 @@ export default function OrderSummaryCard({
         </View>
       )}
 
-      {/* Envío */}
       <View style={styles.row}>
         <Text style={styles.label}>Envío</Text>
         {shipping.isFree ? (
@@ -117,10 +164,8 @@ export default function OrderSummaryCard({
         </Text>
       )}
 
-      {/* Separador */}
       <View style={styles.separator} />
 
-      {/* Total Final */}
       <View style={styles.row}>
         <Text style={styles.totalLabel}>
           Total Final a Pagar - Suma Sección 1 y 2 + Envío
@@ -135,7 +180,14 @@ export default function OrderSummaryCard({
           {totalItems} {totalItems === 1 ? 'producto' : 'productos'}
         </Text>
       )}
-    </View>
+
+      {collapsible && (
+        <View style={styles.seeMoreRowCentered}>
+          <Text style={styles.seeMoreText}>Ver menos</Text>
+          <Feather name="chevron-up" size={14} color={colors.primary} />
+        </View>
+      )}
+    </Wrapper>
   );
 }
 
@@ -233,5 +285,48 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.gray,
     marginTop: 4,
+  },
+  collapsedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  collapsedTextWrap: {
+    flex: 1,
+  },
+  collapsedLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.secondary,
+  },
+  collapsedItems: {
+    fontSize: 12,
+    color: colors.gray,
+    marginTop: 2,
+  },
+  collapsedRight: {
+    alignItems: 'flex-end',
+  },
+  collapsedTotal: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: colors.primary,
+  },
+  seeMoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  seeMoreRowCentered: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+  },
+  seeMoreText: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '600',
+    marginRight: 2,
   },
 });

@@ -76,6 +76,7 @@ export default function CartScreen() {
   const [checkingFlai, setCheckingFlai] = useState(false);
   const [stockErrorMsg, setStockErrorMsg] = useState(null);
   const [bottomHeight, setBottomHeight] = useState(320);
+  const [summaryCollapsed, setSummaryCollapsed] = useState(false);
   const timeoutRef = useRef(null);
 
   const validation = useMemo(
@@ -98,6 +99,15 @@ export default function CartScreen() {
     : 100;
   const progressReached = showProgress && totalParaProgreso >= minRequired;
 
+  useEffect(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSummaryCollapsed(!isValid);
+  }, [isValid]);
+
+  const handleToggleSummary = useCallback(() => {
+    setSummaryCollapsed((v) => !v);
+  }, []);
+
   const handleClearCart = useCallback(() => {
     if (cartItems.length === 0) return;
     Alert.alert(
@@ -116,27 +126,40 @@ export default function CartScreen() {
     };
   }, []);
 
-  useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <TouchableOpacity
-          onPress={handleClearCart}
-          disabled={cartItems.length === 0}
-          style={styles.headerButton}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Text
-            style={[
-              styles.headerButtonText,
-              cartItems.length === 0 && styles.headerButtonTextDisabled,
-            ]}
+  const canGoBack = navigation.canGoBack();
+  const InlineHeader = (
+    <View style={[styles.inlineHeader, { paddingTop: Math.max(8, insets.top) }]}>
+      <View style={styles.inlineHeaderLeft}>
+        {canGoBack ? (
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            Vaciar carrito
-          </Text>
-        </TouchableOpacity>
-      ),
-    });
-  }, [navigation, handleClearCart, cartItems.length]);
+            <Feather name="chevron-left" size={24} color={colors.primary} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.backButton} />
+        )}
+        <Text style={styles.inlineHeaderTitle}>Mi Carrito</Text>
+      </View>
+      <TouchableOpacity
+        onPress={handleClearCart}
+        disabled={cartItems.length === 0}
+        style={styles.headerButton}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      >
+        <Text
+          style={[
+            styles.headerButtonText,
+            cartItems.length === 0 && styles.headerButtonTextDisabled,
+          ]}
+        >
+          Vaciar carrito
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   const handleRemoveItem = useCallback((productId) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -331,25 +354,29 @@ export default function CartScreen() {
 
   if (cartItems.length === 0) {
     return (
-      <View style={styles.emptyContainer}>
-        <View style={styles.emptyIconWrap}>
-          <Feather name="shopping-cart" size={72} color={colors.primary} />
+      <View style={styles.container}>
+        {InlineHeader}
+        <View style={styles.emptyContainer}>
+          <View style={styles.emptyIconWrap}>
+            <Feather name="shopping-cart" size={72} color={colors.primary} />
+          </View>
+          <Text style={styles.emptyTitle}>Tu carrito está vacío</Text>
+          <Text style={styles.emptySubtitle}>Agrega productos para comenzar</Text>
+          <TouchableOpacity
+            style={styles.shopButton}
+            onPress={() => navigation.navigate('Tienda')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.shopButtonText}>Ir a la tienda</Text>
+          </TouchableOpacity>
         </View>
-        <Text style={styles.emptyTitle}>Tu carrito está vacío</Text>
-        <Text style={styles.emptySubtitle}>Agrega productos para comenzar</Text>
-        <TouchableOpacity
-          style={styles.shopButton}
-          onPress={() => navigation.navigate('Tienda')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.shopButtonText}>Ir a la tienda</Text>
-        </TouchableOpacity>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
+      {InlineHeader}
       <Modal
         visible={checkingFlai}
         transparent
@@ -464,6 +491,9 @@ export default function CartScreen() {
           shippingCost={shippingCost}
           totalItems={totalItems}
           showFreeShippingHint
+          collapsible
+          collapsed={summaryCollapsed}
+          onToggleCollapsed={handleToggleSummary}
         />
 
         <TouchableOpacity
@@ -485,6 +515,32 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  inlineHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.white,
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.lightGray,
+  },
+  inlineHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 4,
+  },
+  inlineHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.secondary,
   },
   headerButton: {
     paddingHorizontal: 12,
