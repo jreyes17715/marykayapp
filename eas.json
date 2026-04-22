@@ -6,11 +6,43 @@
     "preview": {
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "WC_CONSUMER_KEY": "ck_08f5c70f059e875473ad4fae249841db52cc4f47",
+        "WC_CONSUMER_SECRET": "cs_59630d68e9a15798db4a2cc46661e45e6b21d822",
+        "WC_BASE_URL": "https://aromadelrosalinvestments.com/wp-json/wc/v3",
+        "WP_REST_URL": "https://aromadelrosalinvestments.com/wp-json",
+        "FLAI_BASE_URL": "https://cel.flai.com.do",
+        "FLAI_LOGIN": "aromadelrosal",
+        "FLAI_PASSWORD": "aroma*27",
+        "FLAI_BYPASS": "true",
+        "AZUL_ENV": "test",
+        "AZUL_MERCHANT_ID": "39038540035",
+        "AZUL_AUTH_KEY": "asdhakjshdkjasdasmndajksdkjaskldga8odya9d8yoasyd98asdyaisdhoaisyd0a8sydoashd8oasydoiahdpiashd09ayusidhaos8dy0a8dya08syd0a8ssdsax",
+        "AZUL_MERCHANT_NAME": "Aroma del Rosal",
+        "AZUL_MERCHANT_TYPE": "ECommerce",
+        "AZUL_CURRENCY_CODE": "$"
       }
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "WC_CONSUMER_KEY": "ck_08f5c70f059e875473ad4fae249841db52cc4f47",
+        "WC_CONSUMER_SECRET": "cs_59630d68e9a15798db4a2cc46661e45e6b21d822",
+        "WC_BASE_URL": "https://aromadelrosalinvestments.com/wp-json/wc/v3",
+        "WP_REST_URL": "https://aromadelrosalinvestments.com/wp-json",
+        "FLAI_BASE_URL": "https://cel.flai.com.do",
+        "FLAI_LOGIN": "aromadelrosal",
+        "FLAI_PASSWORD": "aroma*27",
+        "FLAI_BYPASS": "true",
+        "AZUL_ENV": "test",
+        "AZUL_MERCHANT_ID": "39038540035",
+        "AZUL_AUTH_KEY": "asdhakjshdkjasdasmndajksdkjaskldga8odya9d8yoasyd98asdyaisdhoaisyd0a8sydoashd8oasydoiahdpiashd09ayusidhaos8dy0a8dya08syd0a8ssdsax",
+        "AZUL_MERCHANT_NAME": "Aroma del Rosal",
+        "AZUL_MERCHANT_TYPE": "ECommerce",
+        "AZUL_CURRENCY_CODE": "$"
       }
     }
   }
