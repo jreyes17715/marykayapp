@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -8,7 +9,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { getOrdersByCustomer } from '../api/woocommerce';
 import { formatPrice } from '../utils/helpers';
@@ -53,8 +54,10 @@ export default function OrdersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [staleFromCache, setStaleFromCache] = useState(false);
+  const loadingRef = useRef(false);
 
-  const loadOrders = useCallback(async () => {
+  const loadOrders = useCallback(async (isCancelled = () => false) => {
     // FIX: order-leak-customer-0 — if customerId is 0 or absent the user has no
     // WooCommerce customer record yet. Calling the API with id=0 returns all
     // store orders. Show empty state instead.
@@ -65,21 +68,47 @@ export default function OrdersScreen() {
       setLoading(false);
       return;
     }
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    setStaleFromCache(false);
+    const cacheKey = `@marykay_orders_${customerId}`;
+    let hasCache = false;
+    try {
+      const cached = await AsyncStorage.getItem(cacheKey);
+      if (isCancelled()) { loadingRef.current = false; return; }
+      if (cached) {
+        setOrders(JSON.parse(cached));
+        hasCache = true;
+      }
+    } catch (_) {}
     setLoading(true);
     setError('');
-    const res = await getOrdersByCustomer(customerId);
-    if (res.success && Array.isArray(res.data)) {
-      setOrders(res.data);
-    } else {
-      setError(res.error || 'No se pudieron cargar tus pedidos.');
-      setOrders([]);
+    try {
+      const res = await getOrdersByCustomer(customerId);
+      if (isCancelled()) { loadingRef.current = false; return; }
+      if (res.success && Array.isArray(res.data)) {
+        setOrders(res.data);
+        setStaleFromCache(false);
+        AsyncStorage.setItem(cacheKey, JSON.stringify(res.data)).catch((e) => { console.warn('[OrdersScreen] cache write failed:', e?.message); });
+      } else {
+        if (hasCache) {
+          setStaleFromCache(true);
+        } else {
+          setError(res.error || 'No se pudieron cargar tus pedidos.');
+          setOrders([]);
+        }
+      }
+    } finally {
+      if (!isCancelled()) setLoading(false);
+      loadingRef.current = false;
     }
-    setLoading(false);
   }, [user?.customerId]);
 
-  useEffect(() => {
-    loadOrders();
-  }, [loadOrders]);
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    loadOrders(() => cancelled);
+    return () => { cancelled = true; };
+  }, [loadOrders]));
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -160,6 +189,11 @@ export default function OrdersScreen() {
           <TouchableOpacity style={styles.retryBtn} onPress={loadOrders}>
             <Text style={styles.retryText}>Reintentar</Text>
           </TouchableOpacity>
+        </View>
+      ) : null}
+      {staleFromCache ? (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineBannerText}>Sin conexión — mostrando últimos pedidos guardados</Text>
         </View>
       ) : null}
       <FlatList
@@ -285,6 +319,19 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 15,
     fontWeight: '600',
+  },
+  offlineBanner: {
+    backgroundColor: colors.lightGray,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: colors.gray,
+  },
+  offlineBannerText: {
+    fontSize: 13,
+    color: colors.gray,
+    textAlign: 'center',
   },
   errorBox: {
     backgroundColor: '#FFEBEE',

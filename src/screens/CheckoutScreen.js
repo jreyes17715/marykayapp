@@ -290,6 +290,7 @@ export default function CheckoutScreen() {
         .catch(() => {})
         .finally(() => refreshUserData?.());
     } else {
+      // Dead in practice — order placement guard upstream rejects customerId<=0; kept for safety.
       refreshUserData?.();
     }
   }, [clearCart, user, totalConDescuento, totalPrice, cartItems, refreshUserData]);

@@ -101,7 +101,7 @@ async function buildUserFromToken(token, initialEmail) {
 
     const user = {
       id: wpUser.id,
-      customerId: customer.id,
+      customerId: Number(customer.id) || 0,
       email: customer.email || email,
       displayName: (() => {
         const raw = (customer.first_name && customer.last_name)
@@ -280,9 +280,12 @@ export function AuthProvider({ children }) {
   }, [persistToken, evaluateQuarterlyStatus]);
 
   const logout = useCallback(() => {
+    if (user?.customerId > 0) {
+      AsyncStorage.removeItem(`@marykay_orders_${user.customerId}`).catch(() => {});
+    }
     setUser(null);
     persistToken(null);
-  }, [persistToken]);
+  }, [persistToken, user]);
 
   const refreshUserData = useCallback(async () => {
     if (!user?.token) return;
@@ -290,16 +293,19 @@ export function AuthProvider({ children }) {
       const result = await buildUserFromToken(user.token);
       if (!result.success) throw new Error(result.error);
       setUser(prev => {
-        const fresh = result.user;
-        // hasBoughtKit is monotonic: once true, never revert to false
-        if (prev?.hasBoughtKit && !fresh.hasBoughtKit) {
-          fresh.hasBoughtKit = true;
-          if (fresh.consultantState === CONSULTANT_STATES.NEW) {
-            fresh.consultantState = CONSULTANT_STATES.ACTIVE;
-          }
-          fresh.restrictionState = resolveRestrictionState(fresh);
+        let next = { ...result.user };
+        if (prev?.customerId > 0 && (!next.customerId || next.customerId <= 0)) {
+          console.warn('[AUTH] refreshUserData: fresh.customerId is invalid; preserving prev.customerId for session continuity.');
+          next = { ...next, customerId: Number(prev.customerId) };
         }
-        return fresh;
+        if (prev?.hasBoughtKit && !next.hasBoughtKit) {
+          next = { ...next, hasBoughtKit: true };
+          if (next.consultantState === CONSULTANT_STATES.NEW) {
+            next = { ...next, consultantState: CONSULTANT_STATES.ACTIVE };
+          }
+          next = { ...next, restrictionState: resolveRestrictionState(next) };
+        }
+        return next;
       });
     } catch (e) {
       logout();
