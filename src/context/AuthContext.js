@@ -185,10 +185,37 @@ async function buildUserFromToken(token, initialEmail) {
   return { success: true, user };
 }
 
+// Aplica los guards monotonicos al cruzar un user fresco con el previo:
+// - customerId race: si prev tenia id valido y next devuelve 0/null (eventual
+//   consistency de WC tras un PATCH), preservar el prev.
+// - hasBoughtKit: una vez true, nunca revertir; si quedaba en NEW, promover a ACTIVE.
+function mergeFreshUser(prev, fresh) {
+  let next = { ...fresh };
+  if (prev?.customerId > 0 && (!next.customerId || next.customerId <= 0)) {
+    console.warn('[AUTH] mergeFreshUser: fresh.customerId is invalid; preserving prev.customerId for session continuity.');
+    next = { ...next, customerId: Number(prev.customerId) };
+  }
+  if (prev?.hasBoughtKit && !next.hasBoughtKit) {
+    next = { ...next, hasBoughtKit: true };
+    if (next.consultantState === CONSULTANT_STATES.NEW) {
+      next = { ...next, consultantState: CONSULTANT_STATES.ACTIVE };
+    }
+    next = { ...next, restrictionState: resolveRestrictionState(next) };
+  }
+  return next;
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const lastRefreshAtRef = useRef(0);
+  const userRef = useRef(null);
+  const refreshUserDataRef = useRef(null);
+
+  // Mantener userRef sincronizado para lecturas sincronas (Concurrent Mode safe)
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   const isLoggedIn = !!user;
 
@@ -204,7 +231,7 @@ export function AuthProvider({ children }) {
   // Detecta y aplica transicion de estado por orden completed.
   // Llamado desde login, boot, refreshUserData. Idempotente: si no aplica
   // transicion, retorna false sin tocar nada.
-  const detectAndApplyCompletedTransition = useCallback(async (currentUser) => {
+  const detectAndApplyCompletedTransition = useCallback(async (currentUser, ordersOverride) => {
     if (!currentUser?.customerId || currentUser.customerId <= 0) return false;
 
     const fromInactive = currentUser.restrictionState === CONSULTANT_STATES.INACTIVE;
@@ -220,10 +247,15 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      const ordersResult = await getOrdersByCustomer(currentUser.customerId);
-      if (!ordersResult.success || !ordersResult.data) return false;
+      // Permitir reusar ordenes ya cargadas (evita doble fetch en login/boot)
+      let orders = ordersOverride;
+      if (!orders) {
+        const ordersResult = await getOrdersByCustomer(currentUser.customerId);
+        if (!ordersResult.success || !ordersResult.data) return false;
+        orders = ordersResult.data;
+      }
 
-      const transition = findTransitionFromCompletedOrders(ordersResult.data, currentUser);
+      const transition = findTransitionFromCompletedOrders(orders, currentUser);
       if (!transition) return false;
 
       const transitionMeta = buildMetaUpdatesForTransition(transition.newState, {
@@ -266,15 +298,18 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const evaluateQuarterlyStatus = useCallback(async (currentUser) => {
+  const evaluateQuarterlyStatus = useCallback(async (currentUser, ordersOverride) => {
     if (!currentUser?.customerId) return;
 
     try {
-      // Obtener ordenes del cliente
-      const ordersResult = await getOrdersByCustomer(currentUser.customerId);
-      if (!ordersResult.success || !ordersResult.data) return;
+      // Permitir reusar ordenes ya cargadas (evita doble fetch en login/boot)
+      let orders = ordersOverride;
+      if (!orders) {
+        const ordersResult = await getOrdersByCustomer(currentUser.customerId);
+        if (!ordersResult.success || !ordersResult.data) return;
+        orders = ordersResult.data;
+      }
 
-      const orders = ordersResult.data;
       const metaUpdates = [];
       let newState = currentUser.consultantState;
 
@@ -329,14 +364,21 @@ export function AuthProvider({ children }) {
     await persistToken(token);
     setUser(buildResult.user);
 
-    // Evaluar estado trimestral en background para usuarios ACTIVE e INACTIVE
-    if (buildResult.user.consultantState === CONSULTANT_STATES.ACTIVE ||
-        buildResult.user.consultantState === CONSULTANT_STATES.INACTIVE) {
-      evaluateQuarterlyStatus(buildResult.user).catch(() => {});
-    }
+    // Fetchear ordenes UNA vez y compartir entre quarterly + transition (no bloquear login)
+    (async () => {
+      try {
+        const ordersResult = await getOrdersByCustomer(buildResult.user.customerId);
+        const orders = ordersResult?.success ? ordersResult.data : null;
 
-    // Detectar transicion por orden completed (en background, no bloquear login)
-    detectAndApplyCompletedTransition(buildResult.user).catch(() => {});
+        if (buildResult.user.consultantState === CONSULTANT_STATES.ACTIVE ||
+            buildResult.user.consultantState === CONSULTANT_STATES.INACTIVE) {
+          evaluateQuarterlyStatus(buildResult.user, orders).catch(() => {});
+        }
+        detectAndApplyCompletedTransition(buildResult.user, orders).catch(() => {});
+      } catch (e) {
+        // Background — no bloquear login
+      }
+    })();
 
     return buildResult.user;
   }, [persistToken, evaluateQuarterlyStatus, detectAndApplyCompletedTransition]);
@@ -359,31 +401,12 @@ export function AuthProvider({ children }) {
       const result = await buildUserFromToken(user.token);
       if (!result.success) throw new Error(result.error);
 
-      let mergedUser = null;
-      setUser((prev) => {
-        let next = { ...result.user };
-        // Guard customerId race: WC findCustomerByEmail puede devolver null
-        // tras un PATCH reciente. Preservar customerId previo si era valido.
-        if (prev?.customerId > 0 && (!next.customerId || next.customerId <= 0)) {
-          console.warn('[AUTH] refreshUserData: fresh.customerId is invalid; preserving prev.customerId for session continuity.');
-          next = { ...next, customerId: Number(prev.customerId) };
-        }
-        // hasBoughtKit es monotonico: una vez true, no revertir a false
-        if (prev?.hasBoughtKit && !next.hasBoughtKit) {
-          next = { ...next, hasBoughtKit: true };
-          if (next.consultantState === CONSULTANT_STATES.NEW) {
-            next = { ...next, consultantState: CONSULTANT_STATES.ACTIVE };
-          }
-          next = { ...next, restrictionState: resolveRestrictionState(next) };
-        }
-        mergedUser = next;
-        return next;
-      });
+      // Merge fuera de setUser (Concurrent Mode safe). Lee prev via ref.
+      const merged = mergeFreshUser(userRef.current, result.user);
+      setUser(merged);
 
       // Detectar transicion por orden completed (puede aplicar PATCH adicional)
-      if (mergedUser) {
-        await detectAndApplyCompletedTransition(mergedUser);
-      }
+      await detectAndApplyCompletedTransition(merged);
     } catch (e) {
       logout();
     }
@@ -411,13 +434,22 @@ export function AuthProvider({ children }) {
             if (cancelled) return;
             if (buildResult.success) {
               setUser(buildResult.user);
-              // Evaluar trimestral en background para usuarios ACTIVE e INACTIVE
-              if (buildResult.user.consultantState === CONSULTANT_STATES.ACTIVE ||
-                  buildResult.user.consultantState === CONSULTANT_STATES.INACTIVE) {
-                evaluateQuarterlyStatus(buildResult.user).catch(() => {});
-              }
-              // Detectar transicion por orden completed (en background)
-              detectAndApplyCompletedTransition(buildResult.user).catch(() => {});
+              // Fetchear ordenes UNA vez y compartir
+              (async () => {
+                try {
+                  const ordersResult = await getOrdersByCustomer(buildResult.user.customerId);
+                  if (cancelled) return;
+                  const orders = ordersResult?.success ? ordersResult.data : null;
+
+                  if (buildResult.user.consultantState === CONSULTANT_STATES.ACTIVE ||
+                      buildResult.user.consultantState === CONSULTANT_STATES.INACTIVE) {
+                    evaluateQuarterlyStatus(buildResult.user, orders).catch(() => {});
+                  }
+                  detectAndApplyCompletedTransition(buildResult.user, orders).catch(() => {});
+                } catch (e) {
+                  // Background — no bloquear boot
+                }
+              })();
             } else {
               await persistToken(null);
             }
@@ -434,18 +466,25 @@ export function AuthProvider({ children }) {
     return () => { cancelled = true; };
   }, [evaluateQuarterlyStatus, persistToken, detectAndApplyCompletedTransition]);
 
-  // Refrescar datos al volver la app a foreground (throttled a 5s)
+  // Mantener refreshUserDataRef sincronizado para que el AppState listener
+  // no se re-suscriba en cada re-render (refreshUserData cambia identidad).
+  useEffect(() => {
+    refreshUserDataRef.current = refreshUserData;
+  }, [refreshUserData]);
+
+  // Refrescar datos al volver la app a foreground (throttled a 5s).
+  // Lee refreshUserData via ref para evitar re-suscripciones innecesarias.
   useEffect(() => {
     if (!isLoggedIn) return undefined;
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
-        refreshUserData().catch(() => {});
+        refreshUserDataRef.current?.().catch(() => {});
       }
     });
     return () => {
       subscription?.remove?.();
     };
-  }, [isLoggedIn, refreshUserData]);
+  }, [isLoggedIn]);
 
   const value = useMemo(() => ({
     user,
