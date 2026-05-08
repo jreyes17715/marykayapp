@@ -20,8 +20,7 @@ import { createOrder, getOrderById, getProductImage, formatPrice, stripHtml, upd
 import { getProductPrice } from '../utils/helpers';
 import OrderSummaryCard from '../components/OrderSummaryCard';
 import { validarCarrito, getValidationMessage } from '../utils/cartValidation';
-import { KIT_PRODUCT_ID, PREMIO_PRODUCT_ID, CONSULTANT_STATES } from '../constants/cartRules';
-import { getTransitionAfterPurchase, buildMetaUpdatesForTransition } from '../utils/consultantState';
+import { PREMIO_PRODUCT_ID } from '../constants/cartRules';
 import { cancelReservation } from '../api/flai';
 import { buildPaymentRequest } from '../api/azul';
 import AzulPaymentWebView from '../components/AzulPaymentWebView';
@@ -250,33 +249,15 @@ export default function CheckoutScreen() {
     clearCart();
 
     if (user?.customerId) {
-      const orderTotal = totalConDescuento ?? totalPrice ?? 0;
-      const kitInCart = cartItems.some(item => item.product.id === KIT_PRODUCT_ID);
       const premioInCart = cartItems.some(item => item.product.id === PREMIO_PRODUCT_ID);
 
+      // La transicion de consultant_state (NEW/PENALIZED/INACTIVE -> ACTIVE) y los
+      // flags has_bought_kit / _kit_last_active_purchase_ts ahora se aplican en
+      // refreshUserData cuando la orden alcanza status='completed' (regla de negocio).
+      // Aqui solo PATCHeamos meta que no depende de completion: free shipping y reward.
       const metaUpdates = [
         { key: '_free_shipping_until', value: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString() },
       ];
-
-      const fromInactive = user.restrictionState === CONSULTANT_STATES.INACTIVE;
-      const stateForTransition = fromInactive ? CONSULTANT_STATES.INACTIVE : user.consultantState;
-
-      let newState = getTransitionAfterPurchase(
-        stateForTransition,
-        orderTotal,
-        user.hasBoughtKit,
-        kitInCart
-      );
-
-      if (newState) {
-        const transitionMeta = buildMetaUpdatesForTransition(newState, {
-          hasBoughtKit: !user.hasBoughtKit && kitInCart,
-          fromInactive,
-        });
-        metaUpdates.push(...transitionMeta);
-      } else if (!user.hasBoughtKit && kitInCart) {
-        metaUpdates.push({ key: 'has_bought_kit', value: 'yes' });
-      }
 
       if (premioInCart && user.rewardAvailable) {
         metaUpdates.push(
