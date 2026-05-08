@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   loginUser,
@@ -17,7 +18,11 @@ import {
   computeQuarterlyTotal,
   isRewardEligible,
   resolveRestrictionState,
+  findTransitionFromCompletedOrders,
+  buildMetaUpdatesForTransition,
 } from '../utils/consultantState';
+
+const REFRESH_THROTTLE_MS = 5000;
 
 const TOKEN_STORAGE_KEY = '@marykay_jwt_token';
 
@@ -183,6 +188,7 @@ async function buildUserFromToken(token, initialEmail) {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const lastRefreshAtRef = useRef(0);
 
   const isLoggedIn = !!user;
 
@@ -193,6 +199,59 @@ export function AuthProvider({ children }) {
       return result.user;
     }
     throw new Error(result.error);
+  }, []);
+
+  // Detecta y aplica transicion de estado por orden completed.
+  // Llamado desde login, boot, refreshUserData. Idempotente: si no aplica
+  // transicion, retorna false sin tocar nada.
+  const detectAndApplyCompletedTransition = useCallback(async (currentUser) => {
+    if (!currentUser?.customerId || currentUser.customerId <= 0) return false;
+
+    const fromInactive = currentUser.restrictionState === CONSULTANT_STATES.INACTIVE;
+    const stateForTransition = fromInactive
+      ? CONSULTANT_STATES.INACTIVE
+      : currentUser.consultantState;
+    if (
+      stateForTransition === CONSULTANT_STATES.ACTIVE ||
+      stateForTransition === CONSULTANT_STATES.BLOCKED ||
+      stateForTransition === CONSULTANT_STATES.DISABLED
+    ) {
+      return false;
+    }
+
+    try {
+      const ordersResult = await getOrdersByCustomer(currentUser.customerId);
+      if (!ordersResult.success || !ordersResult.data) return false;
+
+      const transition = findTransitionFromCompletedOrders(ordersResult.data, currentUser);
+      if (!transition) return false;
+
+      const transitionMeta = buildMetaUpdatesForTransition(transition.newState, {
+        hasBoughtKit: transition.hasBoughtKit,
+        fromInactive: transition.fromInactive,
+      });
+
+      await updateCustomer(currentUser.customerId, { meta_data: transitionMeta });
+
+      setUser((prev) => {
+        if (!prev) return prev;
+        const updated = {
+          ...prev,
+          consultantState: transition.newState,
+          hasBoughtKit: transition.hasBoughtKit ? true : prev.hasBoughtKit,
+        };
+        if (transition.fromInactive) {
+          updated.needReactivation = false;
+          updated.lastActivePurchaseTs = String(Math.floor(Date.now() / 1000));
+        }
+        updated.restrictionState = resolveRestrictionState(updated);
+        return updated;
+      });
+      return true;
+    } catch (e) {
+      console.log('[AUTH] detectAndApplyCompletedTransition error:', e?.message);
+      return false;
+    }
   }, []);
 
   const persistToken = useCallback(async (token) => {
@@ -276,35 +335,59 @@ export function AuthProvider({ children }) {
       evaluateQuarterlyStatus(buildResult.user).catch(() => {});
     }
 
+    // Detectar transicion por orden completed (en background, no bloquear login)
+    detectAndApplyCompletedTransition(buildResult.user).catch(() => {});
+
     return buildResult.user;
-  }, [persistToken, evaluateQuarterlyStatus]);
+  }, [persistToken, evaluateQuarterlyStatus, detectAndApplyCompletedTransition]);
 
   const logout = useCallback(() => {
     setUser(null);
     persistToken(null);
   }, [persistToken]);
 
-  const refreshUserData = useCallback(async () => {
+  const refreshUserData = useCallback(async (options = {}) => {
     if (!user?.token) return;
+    const force = options?.force === true;
+    const now = Date.now();
+    if (!force && (now - lastRefreshAtRef.current) < REFRESH_THROTTLE_MS) {
+      return;
+    }
+    lastRefreshAtRef.current = now;
+
     try {
       const result = await buildUserFromToken(user.token);
       if (!result.success) throw new Error(result.error);
-      setUser(prev => {
-        const fresh = result.user;
-        // hasBoughtKit is monotonic: once true, never revert to false
-        if (prev?.hasBoughtKit && !fresh.hasBoughtKit) {
-          fresh.hasBoughtKit = true;
-          if (fresh.consultantState === CONSULTANT_STATES.NEW) {
-            fresh.consultantState = CONSULTANT_STATES.ACTIVE;
-          }
-          fresh.restrictionState = resolveRestrictionState(fresh);
+
+      let mergedUser = null;
+      setUser((prev) => {
+        let next = { ...result.user };
+        // Guard customerId race: WC findCustomerByEmail puede devolver null
+        // tras un PATCH reciente. Preservar customerId previo si era valido.
+        if (prev?.customerId > 0 && (!next.customerId || next.customerId <= 0)) {
+          console.warn('[AUTH] refreshUserData: fresh.customerId is invalid; preserving prev.customerId for session continuity.');
+          next = { ...next, customerId: Number(prev.customerId) };
         }
-        return fresh;
+        // hasBoughtKit es monotonico: una vez true, no revertir a false
+        if (prev?.hasBoughtKit && !next.hasBoughtKit) {
+          next = { ...next, hasBoughtKit: true };
+          if (next.consultantState === CONSULTANT_STATES.NEW) {
+            next = { ...next, consultantState: CONSULTANT_STATES.ACTIVE };
+          }
+          next = { ...next, restrictionState: resolveRestrictionState(next) };
+        }
+        mergedUser = next;
+        return next;
       });
+
+      // Detectar transicion por orden completed (puede aplicar PATCH adicional)
+      if (mergedUser) {
+        await detectAndApplyCompletedTransition(mergedUser);
+      }
     } catch (e) {
       logout();
     }
-  }, [user?.token, logout]);
+  }, [user?.token, logout, detectAndApplyCompletedTransition]);
 
   const isTokenValid = useCallback(async () => {
     if (!user?.token) return false;
@@ -333,6 +416,8 @@ export function AuthProvider({ children }) {
                   buildResult.user.consultantState === CONSULTANT_STATES.INACTIVE) {
                 evaluateQuarterlyStatus(buildResult.user).catch(() => {});
               }
+              // Detectar transicion por orden completed (en background)
+              detectAndApplyCompletedTransition(buildResult.user).catch(() => {});
             } else {
               await persistToken(null);
             }
@@ -347,7 +432,20 @@ export function AuthProvider({ children }) {
       .catch(() => setIsLoading(false));
 
     return () => { cancelled = true; };
-  }, [evaluateQuarterlyStatus, persistToken]);
+  }, [evaluateQuarterlyStatus, persistToken, detectAndApplyCompletedTransition]);
+
+  // Refrescar datos al volver la app a foreground (throttled a 5s)
+  useEffect(() => {
+    if (!isLoggedIn) return undefined;
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        refreshUserData().catch(() => {});
+      }
+    });
+    return () => {
+      subscription?.remove?.();
+    };
+  }, [isLoggedIn, refreshUserData]);
 
   const value = useMemo(() => ({
     user,
