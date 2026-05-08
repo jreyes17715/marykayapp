@@ -241,12 +241,57 @@ REWARD_QUARTERLY_THRESHOLD = 60000    // Minimo trimestral para premio
    - line_items con precios ya calculados con descuento
    - billing y shipping del formulario
    - customer_id del usuario logueado
-6. Si consultora NEW y compro kit → transicion a ACTIVE
-7. Si consultora PENALIZED o INACTIVE y compro >= 20k → transicion a ACTIVE, actualizar `_kit_last_active_purchase_ts`
-8. Si premio en carrito → marcar reward_redeemed
-9. Limpiar carrito (CartContext.clearCart)
-10. Mostrar confirmacion con numero de orden
+6. Aplicar SOLO meta independiente de completion: `_free_shipping_until`
+   y, si premio en carrito, `reward_redeemed`/`reward_available`.
+   La transicion de `consultant_state`, `has_bought_kit` y
+   `_kit_last_active_purchase_ts` NO se aplica en checkout (ver seccion 7.1).
+7. Limpiar carrito (CartContext.clearCart)
+8. Mostrar confirmacion con numero de orden
 ```
+
+### 7.1. Transicion de estado por orden completed
+
+**Regla de negocio:** la transicion de estado de consultora
+(NEW → ACTIVE, PENALIZED → ACTIVE, INACTIVE → ACTIVE) solo aplica cuando
+la orden alcanza `status='completed'`. Una orden en `processing` o
+`pending` NO quita la penalizacion ni cambia el estado.
+
+**Implementacion:**
+
+- `src/utils/consultantState.js#findTransitionFromCompletedOrders(orders, user)`
+  inspecciona la orden completada mas reciente. Si su total y composicion
+  (kit/no-kit) gatillan una transicion segun
+  `getTransitionAfterPurchase`, retorna los datos para construir el meta
+  update. Idempotente: retorna `null` si el usuario ya esta en el estado
+  destino o en estados terminales (BLOCKED, DISABLED).
+
+- `src/context/AuthContext.js#detectAndApplyCompletedTransition(user, orders?)`
+  llama al helper, ejecuta `updateCustomer` con el meta, y actualiza el
+  user local. Acepta `ordersOverride` para evitar doble fetch de ordenes.
+
+**Disparadores de la deteccion** (todos throttled a 5 segundos via
+`refreshUserData`, excepto `force: true`):
+
+1. **Login** y **boot desde token** — fetchea ordenes una sola vez y las
+   pasa a la deteccion (en background, no bloquea login).
+2. **AppState foreground** — al volver la app a primer plano (ej.
+   minimizar y volver mientras admin marca completed en website).
+3. **`useFocusEffect`** en HomeScreen, CartScreen, CheckoutScreen — al
+   enfocar cualquiera de esas pantallas.
+4. **Pull-to-refresh** en HomeScreen y CartScreen — usa `force: true`
+   para bypass del throttle (gesto explicito del usuario).
+
+**Throttle:** `REFRESH_THROTTLE_MS = 5000` en `AuthContext.js`. Llamadas
+sucesivas a `refreshUserData()` dentro de la ventana son no-op. La opcion
+`{ force: true }` ignora el throttle.
+
+**Meta que SI se sigue PATCHeando en checkout** (no depende de
+completion):
+
+- `_free_shipping_until` — bonus de envio gratis por 4 horas tras
+  cualquier compra.
+- `reward_redeemed` / `reward_available` — si el premio estaba en el
+  carrito.
 
 ---
 
