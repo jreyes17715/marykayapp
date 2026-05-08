@@ -10,6 +10,7 @@ import {
   QUARTERLY_THRESHOLD,
   REWARD_QUARTERLY_THRESHOLD,
   DISABLED_MONTHS,
+  KIT_PRODUCT_ID,
 } from '../constants/cartRules';
 
 // Conjunto de valores validos para validacion rapida
@@ -284,4 +285,70 @@ export function getMinimumForState(state) {
     default:
       return null;
   }
+}
+
+/**
+ * Detecta si las ordenes COMPLETADAS del usuario justifican una transicion
+ * de estado. Regla de negocio: la quita de penalizacion (y el resto de
+ * transiciones de getTransitionAfterPurchase) solo aplica cuando la orden
+ * esta en status='completed', no en processing/pending.
+ *
+ * Inspecciona la orden COMPLETADA mas reciente: si su total y composicion
+ * gatillan una transicion segun getTransitionAfterPurchase, retorna los
+ * datos para construir el meta update. Idempotente: retorna null si el
+ * usuario ya esta en el estado destino o en estados terminales (BLOCKED,
+ * DISABLED) que requieren otro flujo.
+ *
+ * @param {Array<object>} orders - Ordenes de WC con status, total, line_items, date_completed/date_created
+ * @param {object} user - Usuario con consultantState, restrictionState, hasBoughtKit
+ * @returns {{ newState: string, fromInactive: boolean, hasBoughtKit: boolean, kitInOrder: boolean } | null}
+ */
+export function findTransitionFromCompletedOrders(orders, user) {
+  if (!Array.isArray(orders) || orders.length === 0) return null;
+  if (!user) return null;
+
+  const fromInactive = user.restrictionState === CONSULTANT_STATES.INACTIVE;
+  const stateForTransition = fromInactive
+    ? CONSULTANT_STATES.INACTIVE
+    : user.consultantState;
+
+  // Estados sin transicion-por-compra: ya activa, bloqueada, o disabled
+  if (
+    stateForTransition === CONSULTANT_STATES.ACTIVE ||
+    stateForTransition === CONSULTANT_STATES.BLOCKED ||
+    stateForTransition === CONSULTANT_STATES.DISABLED
+  ) {
+    return null;
+  }
+
+  // Tomar la orden completada mas reciente
+  const latestCompleted = orders
+    .filter((o) => o && o.status === 'completed')
+    .sort((a, b) => {
+      const da = new Date(a.date_completed || a.date_created || 0).getTime();
+      const db = new Date(b.date_completed || b.date_created || 0).getTime();
+      return db - da;
+    })[0];
+
+  if (!latestCompleted) return null;
+
+  const orderTotal = parseFloat(latestCompleted.total) || 0;
+  const kitInOrder = Array.isArray(latestCompleted.line_items)
+    && latestCompleted.line_items.some((li) => li && li.product_id === KIT_PRODUCT_ID);
+
+  const newState = getTransitionAfterPurchase(
+    stateForTransition,
+    orderTotal,
+    user.hasBoughtKit,
+    kitInOrder,
+  );
+
+  if (!newState || newState === stateForTransition) return null;
+
+  return {
+    newState,
+    fromInactive,
+    hasBoughtKit: !user.hasBoughtKit && kitInOrder,
+    kitInOrder,
+  };
 }

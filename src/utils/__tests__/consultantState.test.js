@@ -18,6 +18,7 @@ import {
   getTransitionAfterPurchase,
   buildMetaUpdatesForTransition,
   getMinimumForState,
+  findTransitionFromCompletedOrders,
 } from '../consultantState';
 
 import {
@@ -647,5 +648,188 @@ describe('getMinimumForState', () => {
     expect(MIN_AMOUNT_ACTIVE).toBe(1000);
     expect(MIN_AMOUNT_PENALIZED).toBe(20000);
     expect(MIN_AMOUNT_INACTIVE).toBe(20000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findTransitionFromCompletedOrders
+// ---------------------------------------------------------------------------
+
+describe('findTransitionFromCompletedOrders', () => {
+  const KIT_ID = 4994;
+
+  const makeOrder = (overrides = {}) => ({
+    status: 'completed',
+    total: '25000',
+    date_completed: '2026-05-01T12:00:00',
+    line_items: [],
+    ...overrides,
+  });
+
+  it('retorna null si orders no es array', () => {
+    expect(findTransitionFromCompletedOrders(null, { consultantState: 'penalized' })).toBeNull();
+    expect(findTransitionFromCompletedOrders(undefined, { consultantState: 'penalized' })).toBeNull();
+  });
+
+  it('retorna null si orders esta vacio', () => {
+    expect(findTransitionFromCompletedOrders([], { consultantState: 'penalized' })).toBeNull();
+  });
+
+  it('retorna null si user es null o undefined', () => {
+    expect(findTransitionFromCompletedOrders([makeOrder()], null)).toBeNull();
+    expect(findTransitionFromCompletedOrders([makeOrder()], undefined)).toBeNull();
+  });
+
+  it('retorna null si no hay ordenes con status completed (solo processing/pending)', () => {
+    const orders = [
+      makeOrder({ status: 'processing', total: '50000' }),
+      makeOrder({ status: 'pending', total: '50000' }),
+    ];
+    const user = { consultantState: CONSULTANT_STATES.PENALIZED, hasBoughtKit: true };
+    expect(findTransitionFromCompletedOrders(orders, user)).toBeNull();
+  });
+
+  it('retorna null si el usuario ya esta ACTIVE sin restriccion', () => {
+    const orders = [makeOrder({ total: '50000' })];
+    const user = { consultantState: CONSULTANT_STATES.ACTIVE, hasBoughtKit: true };
+    expect(findTransitionFromCompletedOrders(orders, user)).toBeNull();
+  });
+
+  it('retorna null si el usuario esta BLOCKED', () => {
+    const orders = [makeOrder({ total: '50000' })];
+    const user = {
+      consultantState: CONSULTANT_STATES.PENALIZED,
+      restrictionState: CONSULTANT_STATES.BLOCKED,
+      hasBoughtKit: true,
+    };
+    // BLOCKED tiene prioridad: stateForTransition = consultantState pero restriction es blocked
+    // En este helper, BLOCKED solo aplica si user.consultantState === BLOCKED
+    user.consultantState = CONSULTANT_STATES.BLOCKED;
+    expect(findTransitionFromCompletedOrders(orders, user)).toBeNull();
+  });
+
+  it('retorna null si el usuario esta DISABLED', () => {
+    const orders = [makeOrder({ total: '50000' })];
+    const user = { consultantState: CONSULTANT_STATES.DISABLED, hasBoughtKit: true };
+    expect(findTransitionFromCompletedOrders(orders, user)).toBeNull();
+  });
+
+  it('PENALIZED + completed >=20000 retorna transicion a ACTIVE', () => {
+    const orders = [makeOrder({ total: '20000' })];
+    const user = { consultantState: CONSULTANT_STATES.PENALIZED, hasBoughtKit: true };
+    const result = findTransitionFromCompletedOrders(orders, user);
+    expect(result).toEqual({
+      newState: CONSULTANT_STATES.ACTIVE,
+      fromInactive: false,
+      hasBoughtKit: false,
+      kitInOrder: false,
+    });
+  });
+
+  it('PENALIZED + completed <20000 retorna null', () => {
+    const orders = [makeOrder({ total: '19999' })];
+    const user = { consultantState: CONSULTANT_STATES.PENALIZED, hasBoughtKit: true };
+    expect(findTransitionFromCompletedOrders(orders, user)).toBeNull();
+  });
+
+  it('NEW + completed >=20000 con kit retorna transicion a ACTIVE con hasBoughtKit', () => {
+    const orders = [
+      makeOrder({ total: '20000', line_items: [{ product_id: KIT_ID }] }),
+    ];
+    const user = { consultantState: CONSULTANT_STATES.NEW, hasBoughtKit: false };
+    const result = findTransitionFromCompletedOrders(orders, user);
+    expect(result).toEqual({
+      newState: CONSULTANT_STATES.ACTIVE,
+      fromInactive: false,
+      hasBoughtKit: true,
+      kitInOrder: true,
+    });
+  });
+
+  it('NEW + completed >=20000 SIN kit retorna null', () => {
+    const orders = [makeOrder({ total: '50000', line_items: [{ product_id: 9999 }] })];
+    const user = { consultantState: CONSULTANT_STATES.NEW, hasBoughtKit: false };
+    expect(findTransitionFromCompletedOrders(orders, user)).toBeNull();
+  });
+
+  it('NEW + completed con kit pero <20000 retorna null', () => {
+    const orders = [
+      makeOrder({ total: '5000', line_items: [{ product_id: KIT_ID }] }),
+    ];
+    const user = { consultantState: CONSULTANT_STATES.NEW, hasBoughtKit: false };
+    expect(findTransitionFromCompletedOrders(orders, user)).toBeNull();
+  });
+
+  it('restrictionState INACTIVE + completed >=20000 retorna transicion con fromInactive=true', () => {
+    const orders = [makeOrder({ total: '20000' })];
+    const user = {
+      consultantState: CONSULTANT_STATES.ACTIVE,
+      restrictionState: CONSULTANT_STATES.INACTIVE,
+      hasBoughtKit: true,
+    };
+    const result = findTransitionFromCompletedOrders(orders, user);
+    expect(result).toEqual({
+      newState: CONSULTANT_STATES.ACTIVE,
+      fromInactive: true,
+      hasBoughtKit: false,
+      kitInOrder: false,
+    });
+  });
+
+  it('toma la orden completada mas reciente cuando hay multiples', () => {
+    const orders = [
+      makeOrder({ total: '5000', date_completed: '2026-04-01T00:00:00' }),
+      makeOrder({ total: '50000', date_completed: '2026-05-01T00:00:00' }),
+      makeOrder({ total: '10000', date_completed: '2026-03-01T00:00:00' }),
+    ];
+    const user = { consultantState: CONSULTANT_STATES.PENALIZED, hasBoughtKit: true };
+    const result = findTransitionFromCompletedOrders(orders, user);
+    // La mas reciente (mayo, 50000) gatilla transicion
+    expect(result.newState).toBe(CONSULTANT_STATES.ACTIVE);
+  });
+
+  it('si la orden mas reciente no califica, retorna null aunque haya orden vieja que califique', () => {
+    const orders = [
+      makeOrder({ total: '50000', date_completed: '2026-03-01T00:00:00' }),
+      makeOrder({ total: '5000', date_completed: '2026-05-01T00:00:00' }),
+    ];
+    const user = { consultantState: CONSULTANT_STATES.PENALIZED, hasBoughtKit: true };
+    expect(findTransitionFromCompletedOrders(orders, user)).toBeNull();
+  });
+
+  it('ignora ordenes processing aunque sean mas recientes que una completed', () => {
+    const orders = [
+      makeOrder({ status: 'processing', total: '50000', date_created: '2026-05-10T00:00:00' }),
+      makeOrder({ total: '20000', date_completed: '2026-05-01T00:00:00' }),
+    ];
+    const user = { consultantState: CONSULTANT_STATES.PENALIZED, hasBoughtKit: true };
+    const result = findTransitionFromCompletedOrders(orders, user);
+    expect(result.newState).toBe(CONSULTANT_STATES.ACTIVE);
+  });
+
+  it('usa date_created como fallback cuando date_completed no existe', () => {
+    const orders = [
+      makeOrder({ total: '20000', date_completed: null, date_created: '2026-05-01T00:00:00' }),
+    ];
+    const user = { consultantState: CONSULTANT_STATES.PENALIZED, hasBoughtKit: true };
+    const result = findTransitionFromCompletedOrders(orders, user);
+    expect(result.newState).toBe(CONSULTANT_STATES.ACTIVE);
+  });
+
+  it('maneja totales como string (formato WC) correctamente', () => {
+    const orders = [makeOrder({ total: '20000.50' })];
+    const user = { consultantState: CONSULTANT_STATES.PENALIZED, hasBoughtKit: true };
+    expect(findTransitionFromCompletedOrders(orders, user).newState).toBe(CONSULTANT_STATES.ACTIVE);
+  });
+
+  it('idempotente: si el estado destino == estado actual, retorna null', () => {
+    // Edge case construido: estado actual ACTIVE pero restrictionState inactive
+    // Si la orden gatilla INACTIVE->ACTIVE, no debe retornar (newState == ACTIVE pero
+    // stateForTransition es INACTIVE -> SI retorna, eso es esperado para limpiar restriction).
+    // El verdadero idempotency: si stateForTransition ya es ACTIVE y no hay restriction,
+    // ya lo cubrimos arriba. Aqui validamos PENALIZED con orden que NO da transicion.
+    const orders = [makeOrder({ total: '5000' })];
+    const user = { consultantState: CONSULTANT_STATES.PENALIZED, hasBoughtKit: true };
+    expect(findTransitionFromCompletedOrders(orders, user)).toBeNull();
   });
 });
