@@ -11,9 +11,10 @@ import {
   Platform,
   ActivityIndicator,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { getProductImage, formatPrice, stripHtml, getProductById } from '../api/woocommerce';
@@ -52,7 +53,26 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 export default function CartScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, refreshUserData } = useAuth();
+  const [refreshingUser, setRefreshingUser] = useState(false);
+
+  // Refrescar datos de usuario al enfocar el carrito (throttled a 5s)
+  useFocusEffect(
+    useCallback(() => {
+      refreshUserData?.().catch(() => {});
+    }, [refreshUserData])
+  );
+
+  const onRefreshUser = useCallback(async () => {
+    setRefreshingUser(true);
+    try {
+      await refreshUserData?.({ force: true });
+    } catch (e) {
+      // ignore
+    } finally {
+      setRefreshingUser(false);
+    }
+  }, [refreshUserData]);
   const {
     cartItems,
     totalItems,
@@ -449,6 +469,14 @@ export default function CartScreen() {
         keyExtractor={keyExtractor}
         contentContainerStyle={[styles.listContent, { paddingBottom: bottomHeight + 24 }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshingUser}
+            onRefresh={onRefreshUser}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
         ListHeaderComponent={
           user?.hasFreeShipping
             ? <FreeShippingBanner expiresAt={user.freeShippingUntil} />

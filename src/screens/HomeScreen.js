@@ -7,8 +7,9 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { getCategories } from '../api/woocommerce';
+import { useAuth } from '../context/AuthContext';
 import BannerCarousel from '../components/BannerCarousel';
 import CategoryGrid from '../components/CategoryGrid';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -19,10 +20,18 @@ const PAD = 16;
 
 export default function HomeScreen() {
   const navigation = useNavigation();
+  const { refreshUserData } = useAuth();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Refrescar datos de usuario al enfocar Home (throttled a 5s)
+  useFocusEffect(
+    useCallback(() => {
+      refreshUserData?.().catch(() => {});
+    }, [refreshUserData])
+  );
 
   const loadData = useCallback(async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
@@ -48,7 +57,8 @@ export default function HomeScreen() {
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadData(true);
-  }, [loadData]);
+    refreshUserData?.({ force: true }).catch(() => {});
+  }, [loadData, refreshUserData]);
 
   React.useEffect(() => {
     loadData();

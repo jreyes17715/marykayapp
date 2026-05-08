@@ -153,6 +153,14 @@ export default function CheckoutScreen() {
     }
   }, [setShippingProvince]);
 
+  // Refrescar datos de usuario al entrar a checkout (throttled a 5s).
+  // Captura cambios externos al estado de consultora (orden completada en website).
+  useFocusEffect(
+    useCallback(() => {
+      refreshUserData?.().catch(() => {});
+    }, [refreshUserData])
+  );
+
   // Bug3+Bug4: Don't auto-goBack (destroys billing form state). Show alert with option to go back.
   // Bug4: Guard with isRestored so validation doesn't run before cart is fully hydrated.
   // H2: Skip validation on success screen to avoid spurious alerts after checkout.
